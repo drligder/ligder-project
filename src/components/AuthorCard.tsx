@@ -121,9 +121,13 @@ const AuthorCard = () => {
             </p>
 
             <p className="bio-paragraph final-bio">
-              Fee distribution back to holders: Every transaction on the liquidity pool generates
-              fees. We're sending them straight back to LITE holders—1:1, no cut. As long as
-              you're holding, you're eligible to claim. It's that simple.
+              Dividends: pool fees are brought on-chain into the treasury; each period the pot is split
+              (75% claimable to holders, 25% management reserve). We snapshot registered wallets&apos;
+              LITE balances, assign entitlements by weight, and you claim with a wallet signature—see{' '}
+              <Link to="/dividends" className="text-blue-700 hover:text-blue-900 underline">
+                Dividends
+              </Link>{' '}
+              for timing, eligibility, and the full rules.
             </p>
           </div>
         </div>
