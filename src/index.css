@@ -474,6 +474,26 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .author-card {
+    padding: 1rem;
+  }
+
+  .social-links {
+    position: static;
+    top: auto;
+    right: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 0.85rem;
+    font-size: 0.92rem;
+    line-height: 1.35;
+  }
+
+  .social-separator {
+    margin: 0 0.2rem;
+  }
+
   .author-layout {
     grid-template-columns: 1fr;
     gap: 1rem;
