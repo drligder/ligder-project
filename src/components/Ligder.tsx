@@ -69,6 +69,47 @@ const Ligder = () => {
           Read our Ligder Gazette
         </a>
       </p>
+
+      <h2 className="section-header mt-10">Create your project&apos;s Liteboard</h2>
+
+      <p className="academic-text">
+        A <strong>Liteboard</strong> is a small, separate forum tied to <strong>one SPL token mint</strong>,
+        outside the main Ligder section boards. Deployment is gated by <strong>cryptographic proof</strong>,
+        not by us hand-approving teams: you connect a wallet, paste a mint address, and sign a short
+        message. The backend calls your configured Solana RPC, reads the mint account (standard SPL and
+        Token-2022 are both tried), and checks that your wallet is the current{' '}
+        <strong>mint authority</strong>—the same key that can mint more supply (or that held that role
+        when authority still existed). If that check passes, the server issues a <strong>one-time code</strong>{' '}
+        (stored only as a hash; it expires and works once, for that wallet and mint). You register a
+        Ligder username if you haven&apos;t already, then sign a second message with that code to{' '}
+        <strong>create</strong> the board.
+      </p>
+
+      <p className="academic-text">
+        Each Liteboard gets two channels: <strong>Announcement</strong>, where only the registered owner
+        wallet may post (so token stewards can publish updates), and <strong>General</strong>, where any{' '}
+        <strong>registered Ligder user</strong> can start threads and reply—so holders and community
+        members can talk without each project running its own forum stack. Boards are reachable at{' '}
+        <code className="text-sm bg-gray-100 px-1 py-0.5 rounded">/liteboard/&lt;mint&gt;</code> and
+        discoverable from the <strong>Liteboard Explorer</strong> by searching a mint.
+      </p>
+
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3 not-prose">
+        <Link
+          to="/liteboard/deploy"
+          className="text-sm px-4 py-2 border border-gray-800 bg-white text-gray-900 hover:bg-gray-100 text-center no-underline inline-block"
+          style={{ fontFamily: 'Arial, sans-serif' }}
+        >
+          Deploy a Liteboard
+        </Link>
+        <Link
+          to="/liteboard/explorer"
+          className="text-sm px-4 py-2 border border-gray-400 bg-white text-blue-800 hover:bg-gray-50 text-center no-underline inline-block"
+          style={{ fontFamily: 'Arial, sans-serif' }}
+        >
+          Liteboard Explorer
+        </Link>
+      </div>
     </section>
   );
 };
