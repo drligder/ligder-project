@@ -58,7 +58,7 @@ const Ligder = () => {
         Just holders and a forum.
       </p>
 
-      <p className="academic-text">
+      <p className="academic-text !mb-0 pb-12 md:pb-16">
         Want to read more?{' '}
         <a
           href="/Papers/ligder-gazette.html"
@@ -70,7 +70,7 @@ const Ligder = () => {
         </a>
       </p>
 
-      <h2 className="section-header mt-10">Create your project&apos;s Liteboard</h2>
+      <h2 className="section-header mt-0">Create your project&apos;s Liteboard</h2>
 
       <p className="academic-text">
         A <strong>Liteboard</strong> is a small, separate forum tied to <strong>one SPL token mint</strong>,
