@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { LoginDropdown } from '../components/LoginDropdown';
 
-const REPO_URL = 'https://github.com/';
+const REPO_URL = 'https://github.com/drligder/ligder-project';
 
 const ForDevelopersPage = () => {
   return (

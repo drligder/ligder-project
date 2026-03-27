@@ -30,7 +30,7 @@ const SiteFooter = () => {
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <a
-            href="https://github.com/"
+            href="https://github.com/drligder/ligder-project"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-700 hover:text-blue-900 underline"
@@ -39,7 +39,7 @@ const SiteFooter = () => {
           </a>
           <span className="text-gray-400">|</span>
           <a
-            href="https://x.com/Birdhouse_Inf"
+            href="https://x.com/Doctor_Ligder"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-700 hover:text-blue-900 underline"

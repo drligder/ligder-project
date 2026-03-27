@@ -65,7 +65,7 @@ const AuthorCard = () => {
           </div>
           <div className="author-photo-socials" aria-label="Social">
             <a
-              href="https://github.com/"
+              href="https://github.com/drligder/ligder-project"
               className="author-social-icon"
               target="_blank"
               rel="noopener noreferrer"
@@ -75,7 +75,7 @@ const AuthorCard = () => {
             </a>
             <span className="author-social-vsep" aria-hidden="true" />
             <a
-              href="https://x.com/Birdhouse_Inf"
+              href="https://x.com/Doctor_Ligder"
               className="author-social-icon"
               target="_blank"
               rel="noopener noreferrer"
