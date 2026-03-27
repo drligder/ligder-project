@@ -147,8 +147,9 @@ const LiteboardDeployPage = () => {
           Deploy a Liteboard
         </h1>
         <p className="text-sm text-gray-700 mb-6" style={{ fontFamily: 'Times New Roman, serif' }}>
-          Prove you are the <strong>on-chain creator</strong> (fee payer of the mint&apos;s first transaction).
-          Mint authority may be revoked; that&apos;s OK. You&apos;ll receive a
+          Prove you <strong>created</strong> the mint: the server loads the mint&apos;s first on-chain
+          transaction and checks that your wallet was the <strong>fee payer or a signer</strong> (works with
+          pump-style relayers). Mint authority may be revoked. You&apos;ll receive a
           one-time code, then sign again to create a public mini-forum at{' '}
           <code className="text-xs bg-gray-100 px-1">/liteboard/&lt;mint&gt;</code> with an{' '}
           <strong>Announcement</strong> channel (you only) and <strong>General</strong> (any registered Ligder

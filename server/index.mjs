@@ -984,9 +984,51 @@ function parsedTransactionFeePayerBase58(tx) {
   return null;
 }
 
+/** All wallets that signed this tx (fee payer + required-signer accounts). Launchpads may use a relayer fee payer. */
+function parsedTransactionRequiredSignerPubkeysSet(tx) {
+  /** @type {Set<string>} */
+  const set = new Set();
+  const fp = parsedTransactionFeePayerBase58(tx);
+  if (fp) set.add(fp);
+  const m = tx?.transaction?.message;
+  if (!m) return set;
+
+  if (Array.isArray(m.accountKeys)) {
+    for (const k of m.accountKeys) {
+      if (!k?.signer) continue;
+      let pkStr = null;
+      if (typeof k === 'string') pkStr = k;
+      else if (k.pubkey) {
+        const pk = k.pubkey;
+        pkStr = typeof pk === 'string' ? pk : pk.toBase58?.() ?? null;
+      }
+      if (pkStr) set.add(pkStr);
+    }
+  }
+
+  const nReq = m.header?.numRequiredSignatures;
+  if (
+    typeof nReq === 'number' &&
+    nReq > 0 &&
+    Array.isArray(m.staticAccountKeys) &&
+    m.staticAccountKeys.length > 0
+  ) {
+    const cap = Math.min(nReq, m.staticAccountKeys.length);
+    for (let i = 0; i < cap; i++) {
+      try {
+        set.add(m.staticAccountKeys[i].toBase58());
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  return set;
+}
+
 /**
- * Liteboard deploy: wallet must be the **fee payer** of the mint’s earliest on-chain tx
- * (matches “creator” when mint authority was later revoked).
+ * Liteboard deploy: wallet must be **fee payer or a required signer** on the mint’s earliest tx
+ * (covers relayer/launchpad flows where the user signs but does not pay fees).
  */
 async function assertWalletIsMintCreator(walletBase58, mintInput) {
   let mintPk;
@@ -1047,18 +1089,18 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
     };
   }
 
-  const feePayer = parsedTransactionFeePayerBase58(parsed);
-  if (!feePayer) {
+  const signers = parsedTransactionRequiredSignerPubkeysSet(parsed);
+  if (signers.size === 0) {
     return {
       ok: false,
-      error: 'Could not determine fee payer for the mint creation transaction.',
+      error: 'Could not read signers for the mint’s earliest transaction.',
     };
   }
-  if (feePayer !== walletBase58) {
+  if (!signers.has(walletBase58)) {
     return {
       ok: false,
       error:
-        'Connected wallet is not the fee payer (on-chain creator) of this mint’s first transaction.',
+        'Connected wallet did not sign the mint’s earliest on-chain transaction (must be fee payer or a required signer—e.g. launchpad relayers pay fees while you still sign).',
     };
   }
 
