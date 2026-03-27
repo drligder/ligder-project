@@ -1,4 +1,4 @@
-# Ligder (BIRDHOUSE)
+# Ligder
 
 Web app: **Vite + React** frontend, **Node (Express)** API, **Supabase** (Postgres + optional Storage), **Solana** (Phantom wallet, optional Memo attestations via a server fee payer).
 
