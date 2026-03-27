@@ -4,6 +4,7 @@ import { LoginDropdown } from '../components/LoginDropdown';
 import { RegistrationWelcomeModal } from '../components/RegistrationWelcomeModal';
 import { ForumBoardsTable } from '../components/forum';
 import { useWallet } from '../contexts/WalletContext';
+import { useForumAccount } from '../hooks/useForumAccount';
 import { LIGDER_PROFILE_UPDATED_EVENT, useLigderProfile } from '../hooks/useLigderProfile';
 import { apiUrl, describeForumApiFailure } from '../lib/apiBase';
 import { parseApiJson } from '../lib/parseApiJson';
@@ -334,7 +335,7 @@ const ForumPage = () => {
               <p className="text-sm text-gray-600 mb-6">No boards in this section yet.</p>
             )}
 
-            {canSeeGovernance ? (
+            {canSeeGovernance || isAdmin ? (
               <>
                 <h2
                   className="text-base font-bold text-gray-900 mb-2 mt-8 border-b border-gray-400 pb-1 flex flex-wrap items-center gap-2"

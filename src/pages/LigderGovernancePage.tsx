@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { LoginDropdown } from '../components/LoginDropdown';
 import { ForumBoardsTable } from '../components/forum/ForumBoardsTable';
 import { useWallet } from '../contexts/WalletContext';
+import { useForumAccount } from '../hooks/useForumAccount';
 import { useLigderProfile } from '../hooks/useLigderProfile';
 import { apiUrl, describeForumApiFailure } from '../lib/apiBase';
 import { parseApiJson } from '../lib/parseApiJson';
@@ -85,8 +86,14 @@ const LigderGovernancePage = () => {
         </h1>
 
         <p className="text-sm text-gray-700 mb-4" style={{ fontFamily: 'Times New Roman, serif' }}>
-          Governance proposals, treasury moves, and protocol changes. Access requires at least 0.25% of
-          total supply (2,500,000 LITE).
+          Governance proposals, treasury moves, and protocol changes. Holders need at least 0.25% of
+          total supply (2,500,000 LITE).{' '}
+          {isAdmin ? (
+            <span className="font-semibold text-gray-900">
+              Your wallet is marked as administrator—you can read and post here without meeting that
+              holding requirement.
+            </span>
+          ) : null}
         </p>
 
         {loading ? (
