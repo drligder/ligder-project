@@ -113,6 +113,28 @@ SOLANA_MEMO_FEE_PAYER_SECRET_KEY=...`}
 
         <section className="mb-8">
           <h2 className="text-base font-bold text-gray-900 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+            Production: static site + API (e.g. Netlify + Railway)
+          </h2>
+          <ul className="list-disc pl-5 space-y-1.5 text-sm text-gray-800" style={{ fontFamily: 'Times New Roman, serif' }}>
+            <li>
+              The <strong>API</strong> runs as a Node process (<code>npm start</code> → Express). Host it on Railway
+              (or any Node host); set the same server env vars as above. Use the <strong>public HTTPS</strong> API URL
+              (not internal-only hostnames).
+            </li>
+            <li>
+              The <strong>frontend</strong> is a Vite build (<code>dist/</code>). On Netlify, set{' '}
+              <code>VITE_API_BASE</code> to that API origin (<code>https://…</code>), scoped to <strong>builds</strong>,
+              and run <code>npm run build</code>. A prebuild step writes Netlify redirects so <code>/api</code> can
+              proxy to the API.
+            </li>
+            <li>
+              Full checklist: <code>for_developers/README.md</code> → section <em>Production hosting (Netlify + Railway)</em>.
+            </li>
+          </ul>
+        </section>
+
+        <section className="mb-8">
+          <h2 className="text-base font-bold text-gray-900 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
             Bootstrap / runbook
           </h2>
           <div className="border border-gray-300 bg-white p-3 text-sm font-mono whitespace-pre-wrap">
@@ -132,7 +154,10 @@ npm run dev`}
           </h2>
           <ul className="list-disc pl-5 space-y-1 text-sm text-gray-800" style={{ fontFamily: 'Times New Roman, serif' }}>
             <li><code>README.md</code> — root quick start + homepage/current feature summary.</li>
-            <li><code>for_developers/README.md</code> — architecture, route/API catalog, deploy notes.</li>
+            <li>
+              <code>for_developers/README.md</code> — architecture, route/API catalog, and{' '}
+              <em>Production hosting (Netlify + Railway)</em>.
+            </li>
             <li><code>for_developers/sql/README.md</code> — migration order and schema map.</li>
             <li><code>server/index.mjs</code> — API source of truth and auth rules.</li>
           </ul>

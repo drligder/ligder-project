@@ -118,7 +118,26 @@ Important variables (non-exhaustive; see `.env.example`):
 | `SOLANA_MEMO_RPC_URL` | Optional separate RPC for Memo relay |
 | `SOLANA_MEMO_FEE_PAYER_SECRET_KEY` | Fee payer for relayed Memo txs (required for on-chain attestations) |
 | `LITE_TOKEN_MINT` | SPL mint for LITE balance display |
-| `VITE_API_BASE` | Optional: API origin for production/static frontends |
+| `VITE_API_BASE` | Optional locally; **required at build time** for static hosting when the API is on another origin (see **Production hosting** below) |
+
+---
+
+## Production hosting (Netlify + Railway)
+
+This repo is often deployed as:
+
+| Piece | Role |
+|-------|------|
+| **Railway (or similar)** | Runs **`npm start`** → `node server/index.mjs`. Set **`PORT`** (Railway injects it), **`SUPABASE_URL`**, **`SUPABASE_SERVICE_ROLE_KEY`**, and other server-only vars from `.env.example`. Use the **public** URL shown under Networking (HTTPS), not `.railway.internal`. |
+| **Netlify (or similar)** | Serves the Vite build from **`dist/`**. Build command **`npm run build`**, publish **`dist`**. |
+
+**Why two hosts:** Netlify only serves static files; the Express API must run on a Node host.
+
+**`VITE_API_BASE`:** Set to the API **origin** only, e.g. `https://your-api.up.railway.app` (**include `https://`**, no trailing slash). It is baked into the client at build time — **not** a secret. Netlify must expose this variable to **builds** (or set it under **`[build.environment]`** in `netlify.toml` in the repo; update that URL when your API host changes).
+
+**`scripts/netlify-prebuild.mjs`:** Runs before `vite build`. It reads **`process.env.VITE_API_BASE`** and writes **`public/_redirects`** so Netlify proxies **`/api/*`** to your Railway API. That way the browser can use same-origin **`/api/...`** without CORS issues. `public/_redirects` is gitignored; it is generated on each deploy.
+
+**GitHub:** Railway and Netlify should point at the same repo/branch you develop on.
 
 ---
 
@@ -140,7 +159,7 @@ npm run dev
 | `npm run dev:server` | API only (`server/index.mjs`, no Vite) |
 | `npm run build` | Production client bundle to `dist/` |
 
-Production static hosting: build the client, point `VITE_API_BASE` at your deployed API, and run the Node server (or equivalent) for `/api`.
+Production static hosting: build the client, point `VITE_API_BASE` at your deployed API, and run the Node server (or equivalent) for `/api`. See **Production hosting (Netlify + Railway)** above for the split-deploy pattern used in this project.
 
 ---
 

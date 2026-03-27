@@ -50,8 +50,17 @@ Core forum UX available from the same app:
 ## Deploy (outline)
 
 1. **Database:** Apply the same SQL your app uses (see `for_developers/sql/`).
-2. **API:** Run `node server/index.mjs` (or your process manager) with production env: Supabase keys, `SERVER_PORT` (or your reverse proxy), Solana RPC and optional **`SOLANA_MEMO_FEE_PAYER_SECRET_KEY`** for on-chain forum attestations.
-3. **Frontend:** `npm run build` and host `dist/` as static files. If the API is on another origin, set **`VITE_API_BASE`** at build time to that origin (see `.env.example`).
+2. **API:** Run `node server/index.mjs` (e.g. **`npm start`**). Set **`PORT`** (or **`SERVER_PORT`**) from the host, **`SUPABASE_*`**, Solana RPC, optional **`SOLANA_MEMO_FEE_PAYER_SECRET_KEY`**, **`LITE_TOKEN_MINT`**, etc. — see [`.env.example`](.env.example). The process must listen on **`0.0.0.0`** in production (this repo’s server does for API-only mode).
+3. **Frontend:** `npm run build` → static site from **`dist/`**.
+
+**Split hosting (common): static site + API elsewhere**
+
+- **API (e.g. Railway):** Connect the GitHub repo, set start command to **`npm start`** (runs `node server/index.mjs`), add the same server env vars as `.env` (never commit secrets). Use the **public** HTTPS URL (e.g. `https://your-api.up.railway.app`) — not internal hostnames.
+- **Frontend (e.g. Netlify):** Connect the repo; build **`npm run build`**, publish **`dist`**. At build time the client needs the API **origin**:
+  - Set **`VITE_API_BASE`** to `https://your-api.up.railway.app` (include **`https://`**, no trailing slash). Scope must include **Builds** in Netlify, or rely on **`[build.environment]`** in [`netlify.toml`](netlify.toml) (update the URL for your deployment).
+  - `npm run build` runs **`scripts/netlify-prebuild.mjs`**, which writes **`public/_redirects`** so Netlify can **proxy `/api/*` → your Railway API** (same-origin `/api` in the browser). See [`for_developers/README.md`](for_developers/README.md) for detail.
+
+`VITE_API_BASE` is **public** (it becomes part of the JS bundle); keep **service role keys and wallet secrets on the API host only**.
 
 ## Documentation
 
