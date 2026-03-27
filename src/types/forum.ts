@@ -46,6 +46,8 @@ export type ThreadDetailPost = {
   poll?: ForumThreadPoll | null;
   /** Server: current wallet may add a poll to this post (author + holder rules) */
   poll_create_eligible?: boolean;
+  /** Server: post author may edit existing poll (signed PATCH) */
+  poll_edit_eligible?: boolean;
 };
 
 /** Passed via React Router state after creating a thread to avoid a loading flash */
@@ -101,6 +103,7 @@ export type ForumThreadPost = {
 
   poll?: ForumThreadPoll | null;
   pollCreateEligible?: boolean;
+  pollEditEligible?: boolean;
 };
 
 export type ForumThreadMeta = {

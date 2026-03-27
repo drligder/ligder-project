@@ -974,6 +974,63 @@ function messageLooksLikeForumPollVote(message, wallet) {
   );
 }
 
+function messageLooksLikeForumPollEdit(message, wallet) {
+  if (!message || typeof message !== 'string') return false;
+  return (
+    message.startsWith('Ligder forum poll edit\n') &&
+    message.includes(`Wallet: ${wallet}`) &&
+    message.includes('Poll:') &&
+    message.includes('Nonce:') &&
+    message.includes('Mode:')
+  );
+}
+
+function parseForumPollEditMessage(message) {
+  const lines = message.split('\n');
+  if (lines[0]?.trim() !== 'Ligder forum poll edit') return null;
+  let i = 1;
+  let pollId = null;
+  let mode = null;
+  for (; i < lines.length; i++) {
+    const L = lines[i];
+    const t = L.trim();
+    if (!t) break;
+    if (L.startsWith('Poll:')) {
+      pollId = L.slice(L.indexOf(':') + 1).trim();
+    } else if (L.startsWith('Mode:')) {
+      const m = L.slice(L.indexOf(':') + 1).trim().toLowerCase();
+      if (m === 'multiple' || m === 'single') mode = m;
+    }
+  }
+  if (!pollId || !UUID_RE.test(pollId) || mode == null) return null;
+  while (i < lines.length && !lines[i].trim()) i += 1;
+  const bodyLines = lines.slice(i);
+  const sepIdx = bodyLines.findIndex((l) => l.trim() === '---');
+  if (sepIdx < 0) return null;
+  const question = bodyLines.slice(0, sepIdx).join('\n').trim();
+  const options = bodyLines
+    .slice(sepIdx + 1)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (
+    !question ||
+    question.length > FORUM_POLL_QUESTION_MAX ||
+    options.length < FORUM_POLL_OPTIONS_MIN ||
+    options.length > FORUM_POLL_OPTIONS_MAX
+  ) {
+    return null;
+  }
+  for (const o of options) {
+    if (o.length > FORUM_POLL_OPTION_MAX) return null;
+  }
+  return {
+    poll_id: pollId,
+    allow_multiple: mode === 'multiple',
+    question,
+    options,
+  };
+}
+
 function parseForumPollCreateMessage(message) {
   const lines = message.split('\n');
   if (lines[0]?.trim() !== 'Ligder forum poll create') return null;
@@ -1170,6 +1227,7 @@ async function attachPollsToPosts(postsOut, board, walletOk) {
     p.poll_create_eligible = Boolean(
       gateAtt && p.author_wallet === walletOk
     );
+    p.poll_edit_eligible = false;
   }
   if (!postsOut.length) return;
   try {
@@ -1236,6 +1294,9 @@ async function attachPollsToPosts(postsOut, board, walletOk) {
       const pol = pollByPost[p.id];
       if (!pol) continue;
       p.poll_create_eligible = false;
+      p.poll_edit_eligible = Boolean(
+        gateAtt && walletOk && p.author_wallet === walletOk
+      );
       const options = (optsByPoll[pol.id] ?? []).map((o) => ({
         id: o.id,
         label: o.label,
@@ -3958,6 +4019,266 @@ app.post('/api/forum/polls', async (req, res) => {
       viewer_can_vote: viewer_can_vote_pc,
       onchain_tx_sig: pollOnchainSig,
       onchain_status: pollOnchainStatus,
+    },
+  });
+});
+
+app.patch('/api/forum/polls', async (req, res) => {
+  const { wallet, message, signature } = req.body ?? {};
+  if (
+    typeof wallet !== 'string' ||
+    typeof message !== 'string' ||
+    typeof signature !== 'string'
+  ) {
+    return res.status(400).json({ error: 'Invalid payload' });
+  }
+  let walletOk;
+  try {
+    walletOk = new PublicKey(wallet).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid wallet' });
+  }
+  if (!messageLooksLikeForumPollEdit(message, walletOk)) {
+    return res.status(400).json({ error: 'Invalid poll edit message' });
+  }
+  if (!verifyWalletSignature(walletOk, message, signature)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  const parsed = parseForumPollEditMessage(message);
+  if (!parsed) {
+    return res.status(400).json({
+      error: `Invalid poll edit body (question 1–${FORUM_POLL_QUESTION_MAX} chars, ${FORUM_POLL_OPTIONS_MIN}–${FORUM_POLL_OPTIONS_MAX} options up to ${FORUM_POLL_OPTION_MAX} chars each; blank line then question, line with only ---, then one option per line)`,
+    });
+  }
+  const banEd = await getActiveBan(walletOk);
+  if (banEd) {
+    return res.status(403).json({
+      error: `You are banned until ${new Date(banEd.banned_until).toLocaleString()}.`,
+    });
+  }
+  const { data: profEd } = await supabase
+    .from('profiles')
+    .select('wallet')
+    .eq('wallet', walletOk)
+    .maybeSingle();
+  if (!profEd) {
+    return res.status(403).json({ error: 'Register a profile to edit a poll' });
+  }
+  const { data: pollRowEd, error: pollEdErr } = await supabase
+    .from('forum_polls')
+    .select('id, post_id, question, allow_multiple, created_by_wallet')
+    .eq('id', parsed.poll_id)
+    .maybeSingle();
+  if (pollEdErr) {
+    console.error(pollEdErr);
+    return res.status(500).json({ error: pollEdErr.message });
+  }
+  if (!pollRowEd) {
+    return res.status(404).json({ error: 'Poll not found' });
+  }
+  if (pollRowEd.created_by_wallet !== walletOk) {
+    return res.status(403).json({ error: 'Only the poll creator can edit this poll' });
+  }
+  const { data: postEd, error: postEdErr } = await supabase
+    .from('forum_thread_posts')
+    .select('id, author_wallet, thread_id')
+    .eq('id', pollRowEd.post_id)
+    .maybeSingle();
+  if (postEdErr || !postEd) {
+    console.error(postEdErr);
+    return res.status(500).json({ error: 'Post lookup failed' });
+  }
+  if (postEd.author_wallet !== walletOk) {
+    return res.status(403).json({ error: 'Only the post author can edit this poll' });
+  }
+  const { data: thEd, error: thEdErr } = await supabase
+    .from('forum_threads')
+    .select('board_id, thread_number, id')
+    .eq('id', postEd.thread_id)
+    .maybeSingle();
+  if (thEdErr || !thEd) {
+    console.error(thEdErr);
+    return res.status(500).json({ error: 'Thread lookup failed' });
+  }
+  const { data: boardEd, error: bEdErr } = await supabase
+    .from('forum_boards')
+    .select('section')
+    .eq('id', thEd.board_id)
+    .maybeSingle();
+  if (bEdErr || !boardEd) {
+    console.error(bEdErr);
+    return res.status(500).json({ error: 'Board lookup failed' });
+  }
+  if (isGovernanceSectionName(boardEd.section)) {
+    const allowEd = await hasGovernanceAccessForWallet(walletOk);
+    if (!allowEd) {
+      return res.status(403).json({
+        error:
+          'Governance board polls require >= 0.25% supply holdings (2,500,000 LITE), or admin/moderator.',
+      });
+    }
+  }
+  const { count: ballotCountRaw, error: bcErr } = await supabase
+    .from('forum_poll_ballots')
+    .select('*', { count: 'exact', head: true })
+    .eq('poll_id', parsed.poll_id);
+  if (bcErr) {
+    const m = String(bcErr.message ?? '');
+    if (/does not exist|relation/i.test(m)) {
+      return res.status(500).json({
+        error: 'Run SQL migration 020_forum_polls.sql on the database',
+      });
+    }
+    console.error(bcErr);
+    return res.status(500).json({ error: bcErr.message });
+  }
+  const ballotCount = Number(ballotCountRaw) || 0;
+  const { data: existingOpts, error: exErr } = await supabase
+    .from('forum_poll_options')
+    .select('id, label, sort_order')
+    .eq('poll_id', parsed.poll_id)
+    .order('sort_order', { ascending: true });
+  if (exErr) {
+    console.error(exErr);
+    return res.status(500).json({ error: exErr.message });
+  }
+  const prevOpts = existingOpts ?? [];
+  if (ballotCount > 0) {
+    if (parsed.allow_multiple !== (pollRowEd.allow_multiple === true)) {
+      return res.status(400).json({
+        error: 'Cannot change single/multi mode after votes have been cast',
+      });
+    }
+    if (parsed.options.length !== prevOpts.length) {
+      return res.status(400).json({
+        error:
+          'Cannot add or remove options after votes have been cast (label fixes only, same number of lines)',
+      });
+    }
+    const { error: upQ } = await supabase
+      .from('forum_polls')
+      .update({
+        question: parsed.question,
+      })
+      .eq('id', parsed.poll_id);
+    if (upQ) {
+      console.error(upQ);
+      return res.status(500).json({ error: upQ.message });
+    }
+    for (let idx = 0; idx < prevOpts.length; idx++) {
+      const { error: upO } = await supabase
+        .from('forum_poll_options')
+        .update({ label: parsed.options[idx] })
+        .eq('id', prevOpts[idx].id);
+      if (upO) {
+        console.error(upO);
+        return res.status(500).json({ error: upO.message });
+      }
+    }
+  } else {
+    const { error: upP } = await supabase
+      .from('forum_polls')
+      .update({
+        question: parsed.question,
+        allow_multiple: parsed.allow_multiple,
+      })
+      .eq('id', parsed.poll_id);
+    if (upP) {
+      console.error(upP);
+      return res.status(500).json({ error: upP.message });
+    }
+    const { error: delO } = await supabase
+      .from('forum_poll_options')
+      .delete()
+      .eq('poll_id', parsed.poll_id);
+    if (delO) {
+      console.error(delO);
+      return res.status(500).json({ error: delO.message });
+    }
+    const insPayload = parsed.options.map((label, idx) => ({
+      poll_id: parsed.poll_id,
+      label,
+      sort_order: idx,
+    }));
+    const { error: insO2 } = await supabase
+      .from('forum_poll_options')
+      .insert(insPayload);
+    if (insO2) {
+      console.error(insO2);
+      return res.status(500).json({ error: insO2.message });
+    }
+  }
+
+  const { data: pollOut, error: poErr } = await supabase
+    .from('forum_polls')
+    .select('id, post_id, question, allow_multiple, created_at')
+    .eq('id', parsed.poll_id)
+    .single();
+  if (poErr || !pollOut) {
+    console.error(poErr);
+    return res.status(500).json({ error: poErr?.message ?? 'Poll reload failed' });
+  }
+  const { data: optionsOutEd, error: ooErr } = await supabase
+    .from('forum_poll_options')
+    .select('id, label, sort_order')
+    .eq('poll_id', parsed.poll_id)
+    .order('sort_order', { ascending: true });
+  if (ooErr) {
+    console.error(ooErr);
+    return res.status(500).json({ error: ooErr.message });
+  }
+  const { data: ballotsEd } = await supabase
+    .from('forum_poll_ballots')
+    .select('poll_id, voter_wallet, option_ids')
+    .eq('poll_id', parsed.poll_id);
+  const tallyEd = {};
+  for (const b of ballotsEd ?? []) {
+    let arr = b.option_ids;
+    if (typeof arr === 'string') {
+      try {
+        arr = JSON.parse(arr);
+      } catch {
+        continue;
+      }
+    }
+    if (!Array.isArray(arr)) continue;
+    for (const oid of arr) {
+      const k = String(oid);
+      tallyEd[k] = (tallyEd[k] || 0) + 1;
+    }
+  }
+  const govEd = isGovernanceSectionName(boardEd.section);
+  const viewerGovEd = await hasGovernanceAccessForWallet(walletOk);
+  const viewer_can_vote_ed = Boolean(!govEd || viewerGovEd);
+  let my_option_ids_ed = null;
+  const mineEd = (ballotsEd ?? []).find((b) => b.voter_wallet === walletOk);
+  if (mineEd) {
+    let arr = mineEd.option_ids;
+    if (typeof arr === 'string') {
+      try {
+        arr = JSON.parse(arr);
+      } catch {
+        arr = [];
+      }
+    }
+    my_option_ids_ed = Array.isArray(arr) ? arr.map(String) : [];
+  }
+
+  return res.json({
+    poll: {
+      id: pollOut.id,
+      post_id: pollOut.post_id,
+      question: pollOut.question,
+      allow_multiple: pollOut.allow_multiple === true,
+      created_at: pollOut.created_at,
+      options: (optionsOutEd ?? []).map((o) => ({
+        id: o.id,
+        label: o.label,
+        sort_order: o.sort_order,
+        votes: tallyEd[o.id] ?? 0,
+      })),
+      my_option_ids: my_option_ids_ed,
+      viewer_can_vote: viewer_can_vote_ed,
     },
   });
 });

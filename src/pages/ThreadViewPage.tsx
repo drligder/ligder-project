@@ -175,6 +175,7 @@ function mapToForumThreadPost(
     replyTo,
     poll: p.poll ?? null,
     pollCreateEligible: p.poll_create_eligible === true,
+    pollEditEligible: p.poll_edit_eligible === true,
   };
 }
 

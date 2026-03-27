@@ -341,6 +341,7 @@ export function ThreadPost({
           postId={post.id}
           poll={post.poll}
           pollCreateEligible={post.pollCreateEligible === true}
+          pollEditEligible={post.pollEditEligible === true}
           isGovernanceBoard={isGovernanceBoard}
           onPollsChanged={() => onThreadPollsRefresh?.()}
         />

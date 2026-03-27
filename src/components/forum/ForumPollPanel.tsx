@@ -11,6 +11,8 @@ type ForumPollPanelProps = {
   postId: string;
   poll: ForumThreadPoll | null | undefined;
   pollCreateEligible: boolean;
+  /** Post author may edit poll text/options (signed PATCH) */
+  pollEditEligible?: boolean;
   isGovernanceBoard: boolean;
   onPollsChanged: () => void;
 };
@@ -19,6 +21,7 @@ export function ForumPollPanel({
   postId,
   poll,
   pollCreateEligible,
+  pollEditEligible = false,
   isGovernanceBoard,
   onPollsChanged,
 }: ForumPollPanelProps) {
@@ -221,6 +224,79 @@ export function ForumPollPanel({
     onPollsChanged,
   ]);
 
+  const editPoll = useCallback(async () => {
+    if (!publicKey || !localPoll || !pollEditEligible) return;
+    const question = editQ.trim();
+    const options = editOpts
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!question) {
+      showToast('Poll question is required.', 'error');
+      return;
+    }
+    if (options.length < 2 || options.length > 10) {
+      showToast('Enter 2–10 options (one per line).', 'error');
+      return;
+    }
+    const nonce = crypto.randomUUID();
+    const mode = editMulti ? 'multiple' : 'single';
+    const message = [
+      'Ligder forum poll edit',
+      `Wallet: ${publicKey}`,
+      `Poll: ${localPoll.id}`,
+      `Nonce: ${nonce}`,
+      `Mode: ${mode}`,
+      '',
+      question,
+      '---',
+      ...options,
+    ].join('\n');
+    setEditing(true);
+    try {
+      const sig = await signMessage(new TextEncoder().encode(message));
+      const r = await fetch(apiUrl('/api/forum/polls'), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wallet: publicKey,
+          message,
+          signature: uint8ToBase64(sig),
+        }),
+      });
+      const j = await parseApiJson<{
+        error?: string;
+        poll?: ForumThreadPoll;
+      }>(r);
+      if (!r.ok) {
+        throw new Error(j.error || `Could not update poll (${r.status})`);
+      }
+      if (j.poll) {
+        setLocalPoll({
+          ...j.poll,
+          my_option_ids: j.poll.my_option_ids ?? null,
+        });
+      }
+      setShowEdit(false);
+      showToast('Poll updated (signed).', 'success');
+      onPollsChanged();
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Poll update failed', 'error');
+    } finally {
+      setEditing(false);
+    }
+  }, [
+    publicKey,
+    localPoll,
+    pollEditEligible,
+    editQ,
+    editOpts,
+    editMulti,
+    signMessage,
+    showToast,
+    onPollsChanged,
+  ]);
+
   const totalVotes = useMemo(() => {
     if (!localPoll?.options.length) return 0;
     return localPoll.options.reduce((s, o) => s + (o.votes || 0), 0);
@@ -229,6 +305,8 @@ export function ForumPollPanel({
   if (!localPoll && !pollCreateEligible) {
     return null;
   }
+
+  const hasVotes = totalVotes > 0;
 
   return (
     <div
@@ -244,59 +322,138 @@ export function ForumPollPanel({
 
       {localPoll ? (
         <>
-          <p className="text-sm font-semibold text-gray-900 m-0 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
-            Poll
-          </p>
-          <p className="text-sm text-gray-800 m-0 mb-2" style={{ fontFamily: 'Times New Roman, serif' }}>
-            {localPoll.question}
-          </p>
-          <ul className="list-none m-0 p-0 space-y-1.5 mb-2">
-            {localPoll.options.map((o) => {
-              const pct =
-                totalVotes > 0 ? Math.round((100 * o.votes) / totalVotes) : 0;
-              return (
-                <li key={o.id} className="flex flex-col gap-0.5">
-                  <label
-                    className={`flex items-start gap-2 text-sm ${
-                      canVoteHere ? 'cursor-pointer' : 'cursor-default'
-                    }`}
-                  >
-                    <input
-                      type={localPoll.allow_multiple ? 'checkbox' : 'radio'}
-                      name={`ligder-poll-${localPoll.id}`}
-                      className="mt-1 shrink-0"
-                      checked={selected.has(o.id)}
-                      disabled={!canVoteHere || voting}
-                      onChange={() => toggleOption(o.id)}
-                    />
-                    <span className="text-gray-800" style={{ fontFamily: 'Times New Roman, serif' }}>
-                      {o.label}
-                    </span>
-                    <span className="text-gray-500 text-xs tabular-nums ml-auto shrink-0">
-                      {o.votes} ({pct}%)
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
-          {canVoteHere ? (
-            <button
-              type="button"
-              disabled={voting || selected.size === 0}
-              onClick={() => void submitVote()}
-              className="text-sm px-3 py-1.5 border border-gray-800 bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-50"
-            >
-              {voting ? 'Signing…' : 'Sign & submit vote'}
-            </button>
-          ) : publicKey && isRegistered && localPoll && !localPoll.viewer_can_vote ? (
-            <p className="text-xs text-amber-900 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
-              You cannot vote on this poll (governance threshold not met).
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <p className="text-sm font-semibold text-gray-900 m-0" style={{ fontFamily: 'Arial, sans-serif' }}>
+              Poll
             </p>
-          ) : !publicKey || !isRegistered ? (
-            <p className="text-xs text-gray-600 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
-              Connect and register to vote.
-            </p>
+            {pollEditEligible && !showEdit ? (
+              <button
+                type="button"
+                className="text-sm text-blue-800 underline hover:text-blue-950"
+                onClick={() => {
+                  setEditQ(localPoll.question);
+                  setEditOpts(localPoll.options.map((o) => o.label).join('\n'));
+                  setEditMulti(localPoll.allow_multiple);
+                  setShowEdit(true);
+                }}
+              >
+                Edit poll
+              </button>
+            ) : null}
+          </div>
+          {showEdit && pollEditEligible ? (
+            <div className="border border-gray-300 bg-gray-50 p-3 space-y-2 mb-3">
+              <p className="text-xs font-semibold text-gray-800 m-0">Edit poll (signed)</p>
+              {hasVotes ? (
+                <p className="text-[0.72rem] text-amber-900 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
+                  Votes have been cast: you can fix question and option wording only—same number of options, same
+                  single/multi mode. To change choices, start a new thread or post.
+                </p>
+              ) : (
+                <p className="text-[0.72rem] text-gray-600 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
+                  No votes yet: you can change the question, options, and single vs multiple.
+                </p>
+              )}
+              <label className="flex items-center gap-2 text-xs text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={editMulti}
+                  onChange={(e) => setEditMulti(e.target.checked)}
+                  disabled={editing || hasVotes}
+                />
+                Allow multiple choices
+              </label>
+              <input
+                type="text"
+                className="w-full text-sm border border-gray-400 px-2 py-1 bg-white"
+                placeholder="Question"
+                value={editQ}
+                onChange={(e) => setEditQ(e.target.value)}
+                maxLength={500}
+                disabled={editing}
+              />
+              <textarea
+                className="w-full text-sm border border-gray-400 px-2 py-1 bg-white font-mono"
+                rows={5}
+                placeholder="Options — one per line (2–10)"
+                value={editOpts}
+                onChange={(e) => setEditOpts(e.target.value)}
+                disabled={editing}
+              />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="text-sm px-3 py-1.5 border border-gray-800 bg-white disabled:opacity-50"
+                  disabled={editing}
+                  onClick={() => void editPoll()}
+                >
+                  {editing ? 'Signing…' : 'Sign & save changes'}
+                </button>
+                <button
+                  type="button"
+                  className="text-sm px-3 py-1.5 border border-gray-400 bg-white"
+                  disabled={editing}
+                  onClick={() => setShowEdit(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {!showEdit ? (
+            <>
+              <p className="text-sm text-gray-800 m-0 mb-2" style={{ fontFamily: 'Times New Roman, serif' }}>
+                {localPoll.question}
+              </p>
+              <ul className="list-none m-0 p-0 space-y-1.5 mb-2">
+                {localPoll.options.map((o) => {
+                  const pct =
+                    totalVotes > 0 ? Math.round((100 * o.votes) / totalVotes) : 0;
+                  return (
+                    <li key={o.id} className="flex flex-col gap-0.5">
+                      <label
+                        className={`flex items-start gap-2 text-sm ${
+                          canVoteHere ? 'cursor-pointer' : 'cursor-default'
+                        }`}
+                      >
+                        <input
+                          type={localPoll.allow_multiple ? 'checkbox' : 'radio'}
+                          name={`ligder-poll-${localPoll.id}`}
+                          className="mt-1 shrink-0"
+                          checked={selected.has(o.id)}
+                          disabled={!canVoteHere || voting}
+                          onChange={() => toggleOption(o.id)}
+                        />
+                        <span className="text-gray-800" style={{ fontFamily: 'Times New Roman, serif' }}>
+                          {o.label}
+                        </span>
+                        <span className="text-gray-500 text-xs tabular-nums ml-auto shrink-0">
+                          {o.votes} ({pct}%)
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+              {canVoteHere ? (
+                <button
+                  type="button"
+                  disabled={voting || selected.size === 0}
+                  onClick={() => void submitVote()}
+                  className="text-sm px-3 py-1.5 border border-gray-800 bg-white text-gray-900 hover:bg-gray-100 disabled:opacity-50"
+                >
+                  {voting ? 'Signing…' : 'Sign & submit vote'}
+                </button>
+              ) : publicKey && isRegistered && localPoll && !localPoll.viewer_can_vote ? (
+                <p className="text-xs text-amber-900 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
+                  You cannot vote on this poll (governance threshold not met).
+                </p>
+              ) : !publicKey || !isRegistered ? (
+                <p className="text-xs text-gray-600 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
+                  Connect and register to vote.
+                </p>
+              ) : null}
+            </>
           ) : null}
         </>
       ) : null}
