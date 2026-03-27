@@ -6,6 +6,25 @@ import type { ForumBoardRow } from './forumBoards';
 
 export type ForumMemberRank = 'Member' | 'Moderator' | 'Administrator';
 
+/** Poll option + vote count from GET thread */
+export type ForumThreadPollOption = {
+  id: string;
+  label: string;
+  sort_order: number;
+  votes: number;
+};
+
+/** Poll attached to a post (server `poll` field) */
+export type ForumThreadPoll = {
+  id: string;
+  question: string;
+  allow_multiple: boolean;
+  created_at: string;
+  options: ForumThreadPollOption[];
+  my_option_ids: string[] | null;
+  viewer_can_vote: boolean;
+};
+
 /** Row from GET thread / merged reply API (snake_case from server) */
 export type ThreadDetailPost = {
   id: string;
@@ -24,6 +43,9 @@ export type ThreadDetailPost = {
   onchain_tx_sig?: string | null;
   /** Optional status: 'pending' | 'failed' | 'confirmed' */
   onchain_status?: string | null;
+  poll?: ForumThreadPoll | null;
+  /** Server: current wallet may add a poll to this post (author + holder rules) */
+  poll_create_eligible?: boolean;
 };
 
 /** Passed via React Router state after creating a thread to avoid a loading flash */
@@ -76,6 +98,9 @@ export type ForumThreadPost = {
     x?: string | null;
     github?: string | null;
   };
+
+  poll?: ForumThreadPoll | null;
+  pollCreateEligible?: boolean;
 };
 
 export type ForumThreadMeta = {

@@ -6,6 +6,7 @@ import type { AuthorForumSidebarStats, ForumMemberRank, ForumThreadPost } from '
 import type { PostVoteAction, PostVoteSnapshot } from '../../types/forumVotes';
 import { PostVoteBar } from './PostVoteBar';
 import { ForumMarkdown } from './ForumMarkdown';
+import { ForumPollPanel } from './ForumPollPanel';
 
 /** Rank label color + matching avatar frame (gentle, readable). */
 const RANK_THEME: Record<ForumMemberRank, { text: string; avatarBorder: string }> = {
@@ -93,6 +94,10 @@ type ThreadPostProps = {
   onAdminBanUser?: (wallet: string, username: string) => void;
   viewerCanEdit?: boolean;
   onEditPost?: (postId: string) => void | Promise<void>;
+  /** Board section is LIGDER GOVERNANCE — poll copy + server gates */
+  isGovernanceBoard?: boolean;
+  /** Refetch thread after poll create/vote */
+  onThreadPollsRefresh?: () => void;
 };
 
 /**
@@ -330,6 +335,13 @@ export function ThreadPost({
         <div className="leading-relaxed break-words flex-1 min-w-0" style={{ fontFamily: 'Times New Roman, serif' }}>
           <ForumMarkdown text={post.body} />
         </div>
+        <ForumPollPanel
+          postId={post.id}
+          poll={post.poll}
+          pollCreateEligible={post.pollCreateEligible === true}
+          isGovernanceBoard={isGovernanceBoard}
+          onPollsChanged={() => onThreadPollsRefresh?.()}
+        />
         <PostVoteBar
           postId={post.id}
           postIndexInThread={index1Based}

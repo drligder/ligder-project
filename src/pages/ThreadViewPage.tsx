@@ -173,6 +173,8 @@ function mapToForumThreadPost(
           }
         : undefined,
     replyTo,
+    poll: p.poll ?? null,
+    pollCreateEligible: p.poll_create_eligible === true,
   };
 }
 
@@ -765,6 +767,8 @@ const ThreadViewPage = () => {
                         ? () => setEditPost({ postId: fp.id, draft: fp.body })
                         : undefined
                     }
+                    isGovernanceBoard={board?.section === 'LIGDER GOVERNANCE'}
+                    onThreadPollsRefresh={() => void loadThread({ silent: true })}
                   />
                 </div>
               );

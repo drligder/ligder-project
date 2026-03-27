@@ -11,6 +11,17 @@ begin;
 
 do $$
 begin
+  -- Polls (020) reference forum_thread_posts — clear before posts if present.
+  if to_regclass('public.forum_poll_ballots') is not null then
+    execute 'truncate table public.forum_poll_ballots restart identity cascade';
+  end if;
+  if to_regclass('public.forum_poll_options') is not null then
+    execute 'truncate table public.forum_poll_options restart identity cascade';
+  end if;
+  if to_regclass('public.forum_polls') is not null then
+    execute 'truncate table public.forum_polls restart identity cascade';
+  end if;
+
   -- Truncate FK-connected forum runtime tables together.
   if to_regclass('public.forum_threads') is not null
      and to_regclass('public.forum_thread_posts') is not null
