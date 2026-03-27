@@ -63,7 +63,7 @@ const LiteboardDeployPage = () => {
       setVerifiedMint(j.mint ?? mint);
       setAuthCode(j.authentication_code ?? null);
       setCodeExpires(j.expires_at ?? null);
-      showToast('Mint authority verified. Save your one-time code.', 'success');
+      showToast('Creator verified. Save your one-time code.', 'success');
     } catch (e) {
       setVerifiedMint(null);
       setAuthCode(null);
@@ -147,7 +147,8 @@ const LiteboardDeployPage = () => {
           Deploy a Liteboard
         </h1>
         <p className="text-sm text-gray-700 mb-6" style={{ fontFamily: 'Times New Roman, serif' }}>
-          Prove you control the <strong>mint authority</strong> of an SPL token. You&apos;ll receive a
+          Prove you are the <strong>on-chain creator</strong> (fee payer of the mint&apos;s first transaction).
+          Mint authority may be revoked; that&apos;s OK. You&apos;ll receive a
           one-time code, then sign again to create a public mini-forum at{' '}
           <code className="text-xs bg-gray-100 px-1">/liteboard/&lt;mint&gt;</code> with an{' '}
           <strong>Announcement</strong> channel (you only) and <strong>General</strong> (any registered Ligder
@@ -172,7 +173,7 @@ const LiteboardDeployPage = () => {
             disabled={busy || createBusy}
             onClick={() => void runVerify()}
           >
-            {busy ? 'Signing…' : 'Check mint authority'}
+            {busy ? 'Signing…' : 'Verify creator'}
           </button>
 
           {authCode ? (

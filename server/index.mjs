@@ -936,7 +936,59 @@ function parseForumThreadReplyMessage(message) {
 const LITEBOARD_CHANNELS = new Set(['announcement', 'general']);
 const LITEBOARD_CODE_TTL_MS = 24 * 60 * 60 * 1000;
 
-async function assertWalletIsMintAuthority(walletBase58, mintInput) {
+/** Oldest signature involving `address` (paginate; mint accounts usually have few txs). */
+async function getOldestSignatureForAddress(connection, pubkey) {
+  let before = undefined;
+  let oldestSig = null;
+  const maxPages = 200;
+  for (let page = 0; page < maxPages; page++) {
+    const sigs = await connection.getSignaturesForAddress(pubkey, {
+      limit: 1000,
+      before,
+    });
+    if (!sigs.length) break;
+    oldestSig = sigs[sigs.length - 1].signature;
+    if (sigs.length < 1000) break;
+    before = oldestSig;
+  }
+  return oldestSig;
+}
+
+function parsedTransactionFeePayerBase58(tx) {
+  if (!tx?.transaction?.message) return null;
+  const m = tx.transaction.message;
+  if (m.staticAccountKeys && m.staticAccountKeys.length > 0) {
+    try {
+      return m.staticAccountKeys[0].toBase58();
+    } catch {
+      /* continue */
+    }
+  }
+  if (m.accountKeys && m.accountKeys.length > 0) {
+    const k = m.accountKeys[0];
+    if (typeof k === 'string') return k;
+    if (k?.pubkey) {
+      const pk = k.pubkey;
+      return typeof pk === 'string' ? pk : pk.toBase58?.() ?? null;
+    }
+  }
+  if (typeof m.getAccountKeys === 'function') {
+    try {
+      const ak = m.getAccountKeys();
+      const k0 = ak.get(0);
+      if (k0) return k0.toBase58();
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
+/**
+ * Liteboard deploy: wallet must be the **fee payer** of the mint’s earliest on-chain tx
+ * (matches “creator” when mint authority was later revoked).
+ */
+async function assertWalletIsMintCreator(walletBase58, mintInput) {
   let mintPk;
   try {
     mintPk = new PublicKey(mintInput.trim());
@@ -944,33 +996,73 @@ async function assertWalletIsMintAuthority(walletBase58, mintInput) {
     return { ok: false, error: 'Invalid mint address' };
   }
   const mintCanonical = mintPk.toBase58();
+
+  let mintOk = false;
   for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
     try {
-      const info = await getMint(dividendsConnection, mintPk, 'confirmed', programId);
-      const auth = info.mintAuthority;
-      if (!auth) {
-        return {
-          ok: false,
-          error:
-            'This mint has no mint authority (fixed supply). Use a mint you still control.',
-        };
-      }
-      if (auth.toBase58() !== walletBase58) {
-        return {
-          ok: false,
-          error: 'Connected wallet is not the mint authority for this SPL token.',
-        };
-      }
-      return { ok: true, mint: mintCanonical };
+      await getMint(dividendsConnection, mintPk, 'confirmed', programId);
+      mintOk = true;
+      break;
     } catch {
-      /* wrong program or RPC error */
+      /* try next program */
     }
   }
-  return {
-    ok: false,
-    error:
-      'Could not read this mint on-chain (check RPC network or SPL token program).',
-  };
+  if (!mintOk) {
+    return {
+      ok: false,
+      error:
+        'Could not read this mint on-chain (check RPC network or SPL token program).',
+    };
+  }
+
+  let oldestSig;
+  try {
+    oldestSig = await getOldestSignatureForAddress(dividendsConnection, mintPk);
+  } catch (e) {
+    console.error(e);
+    return { ok: false, error: 'Could not load signature history for this mint.' };
+  }
+  if (!oldestSig) {
+    return { ok: false, error: 'No on-chain history found for this mint address.' };
+  }
+
+  let parsed;
+  try {
+    parsed = await dividendsConnection.getParsedTransaction(oldestSig, {
+      maxSupportedTransactionVersion: 0,
+      commitment: 'confirmed',
+    });
+  } catch (e) {
+    console.error(e);
+    return {
+      ok: false,
+      error: 'Could not load the mint’s earliest transaction from RPC.',
+    };
+  }
+  if (!parsed?.transaction) {
+    return {
+      ok: false,
+      error:
+        'Earliest mint transaction is not available (RPC retention). Try a full-history RPC.',
+    };
+  }
+
+  const feePayer = parsedTransactionFeePayerBase58(parsed);
+  if (!feePayer) {
+    return {
+      ok: false,
+      error: 'Could not determine fee payer for the mint creation transaction.',
+    };
+  }
+  if (feePayer !== walletBase58) {
+    return {
+      ok: false,
+      error:
+        'Connected wallet is not the fee payer (on-chain creator) of this mint’s first transaction.',
+    };
+  }
+
+  return { ok: true, mint: mintCanonical };
 }
 
 function messageLooksLikeLiteboardMintVerify(message, wallet) {
@@ -6202,7 +6294,7 @@ app.post('/api/liteboard/verify-mint', async (req, res) => {
       error: `You are banned until ${new Date(banV.banned_until).toLocaleString()}.`,
     });
   }
-  const authCheck = await assertWalletIsMintAuthority(walletOk, parsed.mint);
+  const authCheck = await assertWalletIsMintCreator(walletOk, parsed.mint);
   if (!authCheck.ok) {
     return res.status(403).json({ error: authCheck.error });
   }
@@ -6289,7 +6381,7 @@ app.post('/api/liteboard/create', async (req, res) => {
       error: 'Register a Ligder profile before creating a Liteboard.',
     });
   }
-  const authCheck2 = await assertWalletIsMintAuthority(walletOk, parsed.mint);
+  const authCheck2 = await assertWalletIsMintCreator(walletOk, parsed.mint);
   if (!authCheck2.ok) {
     return res.status(403).json({ error: authCheck2.error });
   }
@@ -6590,7 +6682,7 @@ app.post('/api/liteboard/threads', async (req, res) => {
   }
   if (parsed.channel === 'announcement' && lbT.owner_wallet !== walletOk) {
     return res.status(403).json({
-      error: 'Only the token mint authority (Liteboard owner) can post in Announcement.',
+      error: 'Only the Liteboard owner (deploy wallet) can post in Announcement.',
     });
   }
   const { data: maxRows, error: maxErr } = await supabase
