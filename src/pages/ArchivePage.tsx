@@ -161,10 +161,7 @@ const ArchivePage = () => {
         >
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <Link to="/" className="text-blue-700 hover:text-blue-900 underline">
-              ← Home
-            </Link>
-            <Link to="/forums" className="text-blue-700 hover:text-blue-900 underline">
-              ← Forums
+              ← Back to Ligder
             </Link>
           </div>
           <div className="flex items-center gap-2">
