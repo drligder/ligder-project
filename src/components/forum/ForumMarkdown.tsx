@@ -10,21 +10,22 @@ type ForumMarkdownProps = {
 
 export function ForumMarkdown({ text, className }: ForumMarkdownProps) {
   return (
-    <div className={className}>
+    <div className={`space-y-3 leading-relaxed ${className ?? ''}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeSanitize]}
         skipHtml
         components={{
+          // m-0: avoid double margin with parent space-y; gaps come from space-y between blocks
           p: ({ ...props }) => <p {...props} className="m-0" />,
           h1: ({ ...props }) => (
-            <h1 {...props} className="mt-2 mb-1 text-xl font-bold" />
+            <h1 {...props} className="mb-1 text-xl font-bold" />
           ),
           h2: ({ ...props }) => (
-            <h2 {...props} className="mt-2 mb-1 text-lg font-bold" />
+            <h2 {...props} className="mb-1 text-lg font-bold" />
           ),
           h3: ({ ...props }) => (
-            <h3 {...props} className="mt-2 mb-1 text-base font-bold" />
+            <h3 {...props} className="mb-1 text-base font-bold" />
           ),
           ul: ({ ...props }) => <ul {...props} className="m-0 pl-5 list-disc" />,
           ol: ({ ...props }) => <ol {...props} className="m-0 pl-5 list-decimal" />,
@@ -32,7 +33,7 @@ export function ForumMarkdown({ text, className }: ForumMarkdownProps) {
           blockquote: ({ ...props }) => (
             <blockquote
               {...props}
-              className="m-0 mt-2 mb-2 pl-3 border-l-4 border-gray-300 text-gray-800 italic"
+              className="m-0 pl-3 border-l-4 border-gray-300 text-gray-800 italic"
             />
           ),
           // Keep code blocks readable; inline code too.
