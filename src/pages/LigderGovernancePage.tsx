@@ -16,6 +16,7 @@ const BOARD_BASE = '/forums/ligder-governance';
 const LigderGovernancePage = () => {
   const { publicKey } = useWallet();
   const { isRegistered, profileLoading } = useLigderProfile();
+  const { isAdmin } = useForumAccount();
   const showRegister = publicKey ? !profileLoading && !isRegistered : true;
 
   const [boards, setBoards] = useState<ForumBoardRow[]>([]);

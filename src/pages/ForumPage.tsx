@@ -51,6 +51,7 @@ const ForumPage = () => {
   const navigate = useNavigate();
   const { publicKey } = useWallet();
   const { username, isRegistered, profileLoading } = useLigderProfile();
+  const { isAdmin } = useForumAccount();
   const showRegister = publicKey ? !profileLoading && !isRegistered : true;
 
   const [now, setNow] = useState(() => new Date());
