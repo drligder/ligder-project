@@ -11,6 +11,20 @@ begin;
 
 do $$
 begin
+  -- Liteboards (021) — independent of main forum tables.
+  if to_regclass('public.liteboard_thread_posts') is not null then
+    execute 'truncate table public.liteboard_thread_posts restart identity cascade';
+  end if;
+  if to_regclass('public.liteboard_threads') is not null then
+    execute 'truncate table public.liteboard_threads restart identity cascade';
+  end if;
+  if to_regclass('public.liteboard_creation_codes') is not null then
+    execute 'truncate table public.liteboard_creation_codes restart identity cascade';
+  end if;
+  if to_regclass('public.liteboards') is not null then
+    execute 'truncate table public.liteboards restart identity cascade';
+  end if;
+
   -- Polls (020) reference forum_thread_posts — clear before posts if present.
   if to_regclass('public.forum_poll_ballots') is not null then
     execute 'truncate table public.forum_poll_ballots restart identity cascade';

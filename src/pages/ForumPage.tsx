@@ -240,6 +240,22 @@ const ForumPage = () => {
         </h1>
 
         <div
+          className="mb-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm"
+          style={{ fontFamily: 'Arial, sans-serif' }}
+        >
+          <Link
+            to="/liteboard/deploy"
+            className="text-blue-800 underline hover:text-blue-950 font-semibold"
+          >
+            Deploy a Liteboard
+          </Link>
+          <span className="text-gray-300 hidden sm:inline">·</span>
+          <Link to="/liteboard/explorer" className="text-blue-800 underline hover:text-blue-950 font-semibold">
+            Liteboard Explorer
+          </Link>
+        </div>
+
+        <div
           className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-gray-400 bg-gray-50 px-3 py-2.5 text-sm text-gray-800"
           style={{ fontFamily: 'Times New Roman, serif' }}
         >

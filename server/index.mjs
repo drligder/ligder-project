@@ -15,6 +15,9 @@ import {
   createAssociatedTokenAccountIdempotentInstruction,
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
+  getMint,
+  TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
 } from '@solana/spl-token';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
@@ -928,6 +931,158 @@ function parseForumThreadReplyMessage(message) {
   const pl = parentRaw.toLowerCase();
   const parent_post = pl === 'root' ? 'root' : parentRaw;
   return { board_id, thread_number, parent_post, body };
+}
+
+const LITEBOARD_CHANNELS = new Set(['announcement', 'general']);
+const LITEBOARD_CODE_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function assertWalletIsMintAuthority(walletBase58, mintInput) {
+  let mintPk;
+  try {
+    mintPk = new PublicKey(mintInput.trim());
+  } catch {
+    return { ok: false, error: 'Invalid mint address' };
+  }
+  const mintCanonical = mintPk.toBase58();
+  for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+    try {
+      const info = await getMint(dividendsConnection, mintPk, 'confirmed', programId);
+      const auth = info.mintAuthority;
+      if (!auth) {
+        return {
+          ok: false,
+          error:
+            'This mint has no mint authority (fixed supply). Use a mint you still control.',
+        };
+      }
+      if (auth.toBase58() !== walletBase58) {
+        return {
+          ok: false,
+          error: 'Connected wallet is not the mint authority for this SPL token.',
+        };
+      }
+      return { ok: true, mint: mintCanonical };
+    } catch {
+      /* wrong program or RPC error */
+    }
+  }
+  return {
+    ok: false,
+    error:
+      'Could not read this mint on-chain (check RPC network or SPL token program).',
+  };
+}
+
+function messageLooksLikeLiteboardMintVerify(message, wallet) {
+  return (
+    message.startsWith('Ligder liteboard mint verify\n') &&
+    message.includes(`Wallet: ${wallet}`) &&
+    message.includes('Mint:') &&
+    message.includes('Nonce:')
+  );
+}
+
+function parseLiteboardMintVerifyMessage(message) {
+  const mintLine = message.match(/^Mint:\s*(.+)$/m);
+  if (!mintLine) return null;
+  try {
+    const mint = new PublicKey(mintLine[1].trim()).toBase58();
+    return { mint };
+  } catch {
+    return null;
+  }
+}
+
+function messageLooksLikeLiteboardCreate(message, wallet) {
+  return (
+    message.startsWith('Ligder liteboard create\n') &&
+    message.includes(`Wallet: ${wallet}`) &&
+    message.includes('Mint:') &&
+    message.includes('Code:') &&
+    message.includes('Nonce:')
+  );
+}
+
+function parseLiteboardCreateMessage(message) {
+  const mintLine = message.match(/^Mint:\s*(.+)$/m);
+  const codeLine = message.match(/^Code:\s*(.+)$/m);
+  if (!mintLine || !codeLine) return null;
+  let mint;
+  try {
+    mint = new PublicKey(mintLine[1].trim()).toBase58();
+  } catch {
+    return null;
+  }
+  const code = codeLine[1].trim();
+  if (code.length < 8 || code.length > 128) return null;
+  return { mint, code };
+}
+
+function messageLooksLikeLiteboardNewThread(message, wallet) {
+  return (
+    message.startsWith('Ligder liteboard new thread\n') &&
+    message.includes(`Wallet: ${wallet}`) &&
+    message.includes('Mint:') &&
+    message.includes('Channel:') &&
+    message.includes('Title:') &&
+    message.includes('Nonce:')
+  );
+}
+
+function parseLiteboardNewThreadMessage(message) {
+  const mintLine = message.match(/^Mint:\s*(.+)$/m);
+  const chLine = message.match(/^Channel:\s*(\S+)\s*$/m);
+  const titleLine = message.match(/^Title:\s*(.+)$/m);
+  if (!mintLine || !chLine || !titleLine) return null;
+  let mint;
+  try {
+    mint = new PublicKey(mintLine[1].trim()).toBase58();
+  } catch {
+    return null;
+  }
+  const channel = chLine[1].trim().toLowerCase();
+  if (!LITEBOARD_CHANNELS.has(channel)) return null;
+  const title = titleLine[1].trim();
+  if (title.length < 1 || title.length > 200 || /[\r\n]/.test(title)) return null;
+  const body = extractBodyAfterNonceLine(message);
+  if (body === null) return null;
+  return { mint, channel, title, body };
+}
+
+function messageLooksLikeLiteboardThreadReply(message, wallet) {
+  return (
+    message.startsWith('Ligder liteboard thread reply\n') &&
+    message.includes(`Wallet: ${wallet}`) &&
+    message.includes('Mint:') &&
+    message.includes('Channel:') &&
+    message.includes('Thread number:') &&
+    message.includes('Parent post:') &&
+    message.includes('Nonce:')
+  );
+}
+
+function parseLiteboardThreadReplyMessage(message) {
+  const mintLine = message.match(/^Mint:\s*(.+)$/m);
+  const chLine = message.match(/^Channel:\s*(\S+)\s*$/m);
+  const threadNumLine = message.match(/^Thread number:\s*(\d+)\s*$/m);
+  const parentLine = message.match(/^Parent post:\s*(.+)$/m);
+  if (!mintLine || !chLine || !threadNumLine || !parentLine) return null;
+  let mint;
+  try {
+    mint = new PublicKey(mintLine[1].trim()).toBase58();
+  } catch {
+    return null;
+  }
+  const channel = chLine[1].trim().toLowerCase();
+  if (!LITEBOARD_CHANNELS.has(channel)) return null;
+  const thread_number = parseInt(threadNumLine[1], 10);
+  if (!Number.isFinite(thread_number) || thread_number < 1) return null;
+  const parentRaw = parentLine[1].trim();
+  const pl = parentRaw.toLowerCase();
+  const parent_post = pl === 'root' ? 'root' : parentRaw;
+  const body = extractBodyAfterNonceLine(message);
+  if (body === null) return null;
+  return { mint, channel, thread_number, parent_post, body };
 }
 
 function messageLooksLikeForumEditPost(message, wallet) {
@@ -6012,6 +6167,595 @@ app.post('/api/admin/delete-post', async (req, res) => {
     .eq('id', postRow.thread_id);
 
   return res.json({ ok: true, deleted: 'post' });
+});
+
+/** --- Liteboards (per-SPL-mint mini forums; see for_developers/sql/021_liteboards.sql) --- */
+
+app.post('/api/liteboard/verify-mint', async (req, res) => {
+  const { wallet, message, signature } = req.body ?? {};
+  if (
+    typeof wallet !== 'string' ||
+    typeof message !== 'string' ||
+    typeof signature !== 'string'
+  ) {
+    return res.status(400).json({ error: 'Invalid payload' });
+  }
+  let walletOk;
+  try {
+    walletOk = new PublicKey(wallet).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid wallet' });
+  }
+  if (!messageLooksLikeLiteboardMintVerify(message, walletOk)) {
+    return res.status(400).json({ error: 'Invalid liteboard verify message' });
+  }
+  if (!verifyWalletSignature(walletOk, message, signature)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  const parsed = parseLiteboardMintVerifyMessage(message);
+  if (!parsed) {
+    return res.status(400).json({ error: 'Could not parse mint from message' });
+  }
+  const banV = await getActiveBan(walletOk);
+  if (banV) {
+    return res.status(403).json({
+      error: `You are banned until ${new Date(banV.banned_until).toLocaleString()}.`,
+    });
+  }
+  const authCheck = await assertWalletIsMintAuthority(walletOk, parsed.mint);
+  if (!authCheck.ok) {
+    return res.status(403).json({ error: authCheck.error });
+  }
+  const mintCanon = authCheck.mint;
+  const { data: taken } = await supabase
+    .from('liteboards')
+    .select('id')
+    .eq('mint', mintCanon)
+    .maybeSingle();
+  if (taken?.id) {
+    return res.status(409).json({ error: 'A Liteboard already exists for this mint.' });
+  }
+  const plainCode = crypto.randomBytes(24).toString('base64url');
+  const codeHash = sha256Hex(plainCode);
+  const expiresAt = new Date(Date.now() + LITEBOARD_CODE_TTL_MS).toISOString();
+  await supabase
+    .from('liteboard_creation_codes')
+    .delete()
+    .eq('mint', mintCanon)
+    .eq('wallet', walletOk)
+    .is('used_at', null);
+  const { error: insCErr } = await supabase.from('liteboard_creation_codes').insert({
+    mint: mintCanon,
+    wallet: walletOk,
+    code_hash: codeHash,
+    expires_at: expiresAt,
+  });
+  if (insCErr) {
+    const m = String(insCErr.message ?? '');
+    if (/does not exist|relation/i.test(m)) {
+      return res.status(500).json({
+        error: 'Run SQL migration 021_liteboards.sql on the database',
+      });
+    }
+    console.error(insCErr);
+    return res.status(500).json({ error: insCErr.message });
+  }
+  return res.json({
+    ok: true,
+    mint: mintCanon,
+    authentication_code: plainCode,
+    expires_at: expiresAt,
+  });
+});
+
+app.post('/api/liteboard/create', async (req, res) => {
+  const { wallet, message, signature } = req.body ?? {};
+  if (
+    typeof wallet !== 'string' ||
+    typeof message !== 'string' ||
+    typeof signature !== 'string'
+  ) {
+    return res.status(400).json({ error: 'Invalid payload' });
+  }
+  let walletOk;
+  try {
+    walletOk = new PublicKey(wallet).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid wallet' });
+  }
+  if (!messageLooksLikeLiteboardCreate(message, walletOk)) {
+    return res.status(400).json({ error: 'Invalid liteboard create message' });
+  }
+  if (!verifyWalletSignature(walletOk, message, signature)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  const parsed = parseLiteboardCreateMessage(message);
+  if (!parsed) {
+    return res.status(400).json({ error: 'Could not parse mint or code' });
+  }
+  const banC = await getActiveBan(walletOk);
+  if (banC) {
+    return res.status(403).json({
+      error: `You are banned until ${new Date(banC.banned_until).toLocaleString()}.`,
+    });
+  }
+  const { data: profC } = await supabase
+    .from('profiles')
+    .select('wallet')
+    .eq('wallet', walletOk)
+    .maybeSingle();
+  if (!profC) {
+    return res.status(403).json({
+      error: 'Register a Ligder profile before creating a Liteboard.',
+    });
+  }
+  const authCheck2 = await assertWalletIsMintAuthority(walletOk, parsed.mint);
+  if (!authCheck2.ok) {
+    return res.status(403).json({ error: authCheck2.error });
+  }
+  const mintCanon = authCheck2.mint;
+  const codeHash = sha256Hex(parsed.code);
+  const nowIso = new Date().toISOString();
+  const { data: codeRow, error: codeFindErr } = await supabase
+    .from('liteboard_creation_codes')
+    .select('id, expires_at, used_at')
+    .eq('mint', mintCanon)
+    .eq('wallet', walletOk)
+    .eq('code_hash', codeHash)
+    .maybeSingle();
+  if (codeFindErr) {
+    console.error(codeFindErr);
+    return res.status(500).json({ error: codeFindErr.message });
+  }
+  if (!codeRow?.id || codeRow.used_at) {
+    return res.status(403).json({ error: 'Invalid or already used authentication code.' });
+  }
+  if (new Date(codeRow.expires_at).getTime() < Date.now()) {
+    return res.status(403).json({ error: 'Authentication code expired. Run verify again.' });
+  }
+  const { data: existsLb } = await supabase
+    .from('liteboards')
+    .select('id')
+    .eq('mint', mintCanon)
+    .maybeSingle();
+  if (existsLb?.id) {
+    return res.status(409).json({ error: 'Liteboard already exists for this mint.' });
+  }
+  const { data: lbIns, error: lbErr } = await supabase
+    .from('liteboards')
+    .insert({ mint: mintCanon, owner_wallet: walletOk })
+    .select('id, mint, owner_wallet, created_at')
+    .single();
+  if (lbErr) {
+    const m = String(lbErr.message ?? '');
+    if (/does not exist|relation/i.test(m)) {
+      return res.status(500).json({
+        error: 'Run SQL migration 021_liteboards.sql on the database',
+      });
+    }
+    console.error(lbErr);
+    return res.status(500).json({ error: lbErr.message });
+  }
+  await supabase
+    .from('liteboard_creation_codes')
+    .update({ used_at: nowIso })
+    .eq('id', codeRow.id);
+  return res.status(201).json({ liteboard: lbIns });
+});
+
+app.get('/api/liteboards', async (req, res) => {
+  const q = String(req.query.q ?? '').trim();
+  let query = supabase
+    .from('liteboards')
+    .select('id, mint, owner_wallet, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (q.length >= 3) {
+    let canon = q;
+    try {
+      canon = new PublicKey(q).toBase58();
+    } catch {
+      /* prefix search on raw */
+    }
+    query = supabase
+      .from('liteboards')
+      .select('id, mint, owner_wallet, created_at')
+      .ilike('mint', `%${canon}%`)
+      .order('created_at', { ascending: false })
+      .limit(50);
+  }
+  const { data, error } = await query;
+  if (error) {
+    const m = String(error.message ?? '');
+    if (/does not exist|relation/i.test(m)) {
+      return res.json({ liteboards: [] });
+    }
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+  return res.json({ liteboards: data ?? [] });
+});
+
+app.get('/api/liteboards/:mint', async (req, res) => {
+  let mintOk;
+  try {
+    mintOk = new PublicKey(String(req.params.mint ?? '').trim()).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid mint' });
+  }
+  const { data, error } = await supabase
+    .from('liteboards')
+    .select('id, mint, owner_wallet, created_at')
+    .eq('mint', mintOk)
+    .maybeSingle();
+  if (error) {
+    console.error(error);
+    return res.status(500).json({ error: error.message });
+  }
+  if (!data) {
+    return res.status(404).json({ error: 'Liteboard not found' });
+  }
+  return res.json({ liteboard: data });
+});
+
+app.get('/api/liteboards/:mint/threads', async (req, res) => {
+  let mintOk;
+  try {
+    mintOk = new PublicKey(String(req.params.mint ?? '').trim()).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid mint' });
+  }
+  const channel = String(req.query.channel ?? '').trim().toLowerCase();
+  if (!LITEBOARD_CHANNELS.has(channel)) {
+    return res.status(400).json({ error: 'channel must be announcement or general' });
+  }
+  const { data: lb, error: lbErr } = await supabase
+    .from('liteboards')
+    .select('id')
+    .eq('mint', mintOk)
+    .maybeSingle();
+  if (lbErr) {
+    console.error(lbErr);
+    return res.status(500).json({ error: lbErr.message });
+  }
+  if (!lb) {
+    return res.status(404).json({ error: 'Liteboard not found' });
+  }
+  const { data: threads, error: tErr } = await supabase
+    .from('liteboard_threads')
+    .select('*')
+    .eq('liteboard_id', lb.id)
+    .eq('channel', channel)
+    .order('updated_at', { ascending: false });
+  if (tErr) {
+    const m = String(tErr.message ?? '');
+    if (/does not exist|relation/i.test(m)) {
+      return res.status(500).json({
+        error: 'Run SQL migration 021_liteboards.sql on the database',
+      });
+    }
+    console.error(tErr);
+    return res.status(500).json({ error: tErr.message });
+  }
+  const list = threads ?? [];
+  const wallets = [...new Set(list.map((t) => t.author_wallet))];
+  let authorMap = {};
+  if (wallets.length > 0) {
+    const { data: authors } = await supabase
+      .from('profiles')
+      .select('wallet, username')
+      .in('wallet', wallets);
+    authorMap = Object.fromEntries((authors ?? []).map((a) => [a.wallet, a.username]));
+  }
+  return res.json({
+    liteboard_id: lb.id,
+    mint: mintOk,
+    channel,
+    threads: list.map((t) => ({
+      ...t,
+      author_username: authorMap[t.author_wallet] ?? null,
+    })),
+  });
+});
+
+app.get('/api/liteboards/:mint/threads/:threadNum', async (req, res) => {
+  let mintOk;
+  try {
+    mintOk = new PublicKey(String(req.params.mint ?? '').trim()).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid mint' });
+  }
+  const channel = String(req.query.channel ?? '').trim().toLowerCase();
+  if (!LITEBOARD_CHANNELS.has(channel)) {
+    return res.status(400).json({ error: 'channel must be announcement or general' });
+  }
+  const threadNum = parseInt(String(req.params.threadNum ?? '').trim(), 10);
+  if (!Number.isFinite(threadNum) || threadNum < 1) {
+    return res.status(400).json({ error: 'Invalid thread number' });
+  }
+  const { data: lb, error: lbErr } = await supabase
+    .from('liteboards')
+    .select('id, mint, owner_wallet')
+    .eq('mint', mintOk)
+    .maybeSingle();
+  if (lbErr || !lb) {
+    if (lbErr) console.error(lbErr);
+    return res.status(404).json({ error: 'Liteboard not found' });
+  }
+  const { data: thread, error: thErr } = await supabase
+    .from('liteboard_threads')
+    .select('*')
+    .eq('liteboard_id', lb.id)
+    .eq('channel', channel)
+    .eq('thread_number', threadNum)
+    .maybeSingle();
+  if (thErr) {
+    console.error(thErr);
+    return res.status(500).json({ error: thErr.message });
+  }
+  if (!thread) {
+    return res.status(404).json({ error: 'Thread not found' });
+  }
+  const { data: postRows, error: pErr } = await supabase
+    .from('liteboard_thread_posts')
+    .select('id, thread_id, parent_id, body, author_wallet, created_at')
+    .eq('thread_id', thread.id)
+    .order('created_at', { ascending: true });
+  if (pErr) {
+    console.error(pErr);
+    return res.status(500).json({ error: pErr.message });
+  }
+  const posts = postRows ?? [];
+  const pwallets = [...new Set(posts.map((p) => p.author_wallet))];
+  let profMap = {};
+  if (pwallets.length > 0) {
+    const { data: profs } = await supabase
+      .from('profiles')
+      .select('wallet, username, avatar_url, is_admin, is_moderator')
+      .in('wallet', pwallets);
+    for (const p of profs ?? []) {
+      profMap[p.wallet] = p;
+    }
+  }
+  const postsOut = posts.map((p) => {
+    const pr = profMap[p.author_wallet];
+    return {
+      ...p,
+      author_username: pr?.username ?? null,
+      author_avatar_url: pr?.avatar_url ?? null,
+      author_is_admin: pr?.is_admin === true,
+      author_is_moderator: pr?.is_moderator === true && pr?.is_admin !== true,
+    };
+  });
+  return res.json({
+    liteboard: lb,
+    thread,
+    posts: postsOut,
+  });
+});
+
+app.post('/api/liteboard/threads', async (req, res) => {
+  const { wallet, message, signature } = req.body ?? {};
+  if (
+    typeof wallet !== 'string' ||
+    typeof message !== 'string' ||
+    typeof signature !== 'string'
+  ) {
+    return res.status(400).json({ error: 'Invalid payload' });
+  }
+  let walletOk;
+  try {
+    walletOk = new PublicKey(wallet).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid wallet' });
+  }
+  if (!messageLooksLikeLiteboardNewThread(message, walletOk)) {
+    return res.status(400).json({ error: 'Invalid liteboard new-thread message' });
+  }
+  if (!verifyWalletSignature(walletOk, message, signature)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  const parsed = parseLiteboardNewThreadMessage(message);
+  if (!parsed) {
+    return res.status(400).json({ error: 'Could not parse thread fields' });
+  }
+  const bodyTrim = parsed.body.trim();
+  if (bodyTrim.length < 1 || bodyTrim.length > FORUM_OP_BODY_MAX) {
+    return res.status(400).json({
+      error: `Opening post must be 1–${FORUM_OP_BODY_MAX} characters`,
+    });
+  }
+  const banT = await getActiveBan(walletOk);
+  if (banT) {
+    return res.status(403).json({
+      error: `You are banned until ${new Date(banT.banned_until).toLocaleString()}.`,
+    });
+  }
+  const { data: profT } = await supabase
+    .from('profiles')
+    .select('wallet')
+    .eq('wallet', walletOk)
+    .maybeSingle();
+  if (!profT) {
+    return res.status(403).json({ error: 'Register before posting on a Liteboard.' });
+  }
+  const { data: lbT, error: lbTErr } = await supabase
+    .from('liteboards')
+    .select('id, owner_wallet')
+    .eq('mint', parsed.mint)
+    .maybeSingle();
+  if (lbTErr || !lbT) {
+    if (lbTErr) console.error(lbTErr);
+    return res.status(404).json({ error: 'Liteboard not found' });
+  }
+  if (parsed.channel === 'announcement' && lbT.owner_wallet !== walletOk) {
+    return res.status(403).json({
+      error: 'Only the token mint authority (Liteboard owner) can post in Announcement.',
+    });
+  }
+  const { data: maxRows, error: maxErr } = await supabase
+    .from('liteboard_threads')
+    .select('thread_number')
+    .eq('liteboard_id', lbT.id)
+    .eq('channel', parsed.channel)
+    .order('thread_number', { ascending: false })
+    .limit(1);
+  if (maxErr) {
+    console.error(maxErr);
+    return res.status(500).json({ error: maxErr.message });
+  }
+  const nextNum = (Number(maxRows?.[0]?.thread_number) || 0) + 1;
+  const { data: threadIns, error: insTErr } = await supabase
+    .from('liteboard_threads')
+    .insert({
+      liteboard_id: lbT.id,
+      channel: parsed.channel,
+      title: parsed.title,
+      author_wallet: walletOk,
+      thread_number: nextNum,
+    })
+    .select('*')
+    .single();
+  if (insTErr) {
+    console.error(insTErr);
+    return res.status(500).json({ error: insTErr.message });
+  }
+  const { data: opPost, error: opErr } = await supabase
+    .from('liteboard_thread_posts')
+    .insert({
+      thread_id: threadIns.id,
+      parent_id: null,
+      body: bodyTrim,
+      author_wallet: walletOk,
+    })
+    .select('id, thread_id, parent_id, body, author_wallet, created_at')
+    .single();
+  if (opErr) {
+    console.error(opErr);
+    await supabase.from('liteboard_threads').delete().eq('id', threadIns.id);
+    return res.status(500).json({ error: opErr.message });
+  }
+  const tsRow = await supabase
+    .from('profiles')
+    .select('threads_started')
+    .eq('wallet', walletOk)
+    .maybeSingle();
+  const ts = Number(tsRow.data?.threads_started) || 0;
+  await supabase.from('profiles').update({ threads_started: ts + 1 }).eq('wallet', walletOk);
+  return res.status(201).json({
+    thread: threadIns,
+    opening_post: opPost,
+  });
+});
+
+app.post('/api/liteboard/replies', async (req, res) => {
+  const { wallet, message, signature } = req.body ?? {};
+  if (
+    typeof wallet !== 'string' ||
+    typeof message !== 'string' ||
+    typeof signature !== 'string'
+  ) {
+    return res.status(400).json({ error: 'Invalid payload' });
+  }
+  let walletOk;
+  try {
+    walletOk = new PublicKey(wallet).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid wallet' });
+  }
+  if (!messageLooksLikeLiteboardThreadReply(message, walletOk)) {
+    return res.status(400).json({ error: 'Invalid liteboard reply message' });
+  }
+  if (!verifyWalletSignature(walletOk, message, signature)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  const parsed = parseLiteboardThreadReplyMessage(message);
+  if (!parsed) {
+    return res.status(400).json({ error: 'Could not parse reply' });
+  }
+  const bodyTrim = parsed.body.trim();
+  if (bodyTrim.length < 1 || bodyTrim.length > FORUM_REPLY_BODY_MAX) {
+    return res.status(400).json({
+      error: `Reply must be 1–${FORUM_REPLY_BODY_MAX} characters`,
+    });
+  }
+  const banR = await getActiveBan(walletOk);
+  if (banR) {
+    return res.status(403).json({
+      error: `You are banned until ${new Date(banR.banned_until).toLocaleString()}.`,
+    });
+  }
+  const { data: profR } = await supabase
+    .from('profiles')
+    .select('wallet')
+    .eq('wallet', walletOk)
+    .maybeSingle();
+  if (!profR) {
+    return res.status(403).json({ error: 'Register before replying.' });
+  }
+  const { data: lbR, error: lbRErr } = await supabase
+    .from('liteboards')
+    .select('id, owner_wallet')
+    .eq('mint', parsed.mint)
+    .maybeSingle();
+  if (lbRErr || !lbR) {
+    if (lbRErr) console.error(lbRErr);
+    return res.status(404).json({ error: 'Liteboard not found' });
+  }
+  if (parsed.channel === 'announcement' && lbR.owner_wallet !== walletOk) {
+    return res.status(403).json({
+      error: 'Only the Liteboard owner can post in Announcement.',
+    });
+  }
+  const { data: threadR, error: thRErr } = await supabase
+    .from('liteboard_threads')
+    .select('id, posts_count')
+    .eq('liteboard_id', lbR.id)
+    .eq('channel', parsed.channel)
+    .eq('thread_number', parsed.thread_number)
+    .maybeSingle();
+  if (thRErr || !threadR) {
+    if (thRErr) console.error(thRErr);
+    return res.status(404).json({ error: 'Thread not found' });
+  }
+  let parentId = null;
+  if (parsed.parent_post !== 'root') {
+    if (!UUID_RE.test(parsed.parent_post)) {
+      return res.status(400).json({ error: 'Invalid parent post id' });
+    }
+    const { data: parentRow } = await supabase
+      .from('liteboard_thread_posts')
+      .select('id, thread_id')
+      .eq('id', parsed.parent_post)
+      .maybeSingle();
+    if (!parentRow || parentRow.thread_id !== threadR.id) {
+      return res.status(400).json({ error: 'Parent post not in this thread' });
+    }
+    parentId = parentRow.id;
+  }
+  const { data: newPost, error: insPErr } = await supabase
+    .from('liteboard_thread_posts')
+    .insert({
+      thread_id: threadR.id,
+      parent_id: parentId,
+      body: bodyTrim,
+      author_wallet: walletOk,
+    })
+    .select('id, thread_id, parent_id, body, author_wallet, created_at')
+    .single();
+  if (insPErr) {
+    console.error(insPErr);
+    return res.status(500).json({ error: insPErr.message });
+  }
+  const prev = Number(threadR.posts_count) || 0;
+  await supabase
+    .from('liteboard_threads')
+    .update({
+      posts_count: prev + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', threadR.id);
+  return res.status(201).json({ post: newPost });
 });
 
 app.use((req, res, next) => {

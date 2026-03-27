@@ -16,6 +16,10 @@ const SiteFooter = () => {
             Forums
           </Link>
           <span className="text-gray-400">|</span>
+          <Link to="/liteboard/explorer" className="text-blue-700 hover:text-blue-900 underline">
+            Liteboards
+          </Link>
+          <span className="text-gray-400">|</span>
           <Link to="/forums/archive" className="text-blue-700 hover:text-blue-900 underline">
             Archive
           </Link>

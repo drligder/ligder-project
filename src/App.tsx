@@ -18,6 +18,11 @@ import PublicProfilePage from './pages/PublicProfilePage';
 import MessagesPage from './pages/MessagesPage';
 import ForDevelopersPage from './pages/ForDevelopersPage';
 import DividendsPage from './pages/DividendsPage';
+import LiteboardChannelPage from './pages/LiteboardChannelPage';
+import LiteboardDeployPage from './pages/LiteboardDeployPage';
+import LiteboardExplorerPage from './pages/LiteboardExplorerPage';
+import LiteboardHubPage from './pages/LiteboardHubPage';
+import LiteboardThreadPage from './pages/LiteboardThreadPage';
 import SiteFooter from './components/SiteFooter';
 
 function ScrollToTopOnRouteChange() {
@@ -49,6 +54,14 @@ function App() {
       <ScrollToTopOnRouteChange />
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/liteboard/deploy" element={<LiteboardDeployPage />} />
+        <Route path="/liteboard/explorer" element={<LiteboardExplorerPage />} />
+        <Route
+          path="/liteboard/:mint/:channel/:threadNumber"
+          element={<LiteboardThreadPage />}
+        />
+        <Route path="/liteboard/:mint/:channel" element={<LiteboardChannelPage />} />
+        <Route path="/liteboard/:mint" element={<LiteboardHubPage />} />
         <Route path="/forums" element={<ForumPage />} />
         <Route path="/forums/archive" element={<ArchivePage />} />
         <Route path="/forums/ligder-official" element={<LigderOfficialPage />} />

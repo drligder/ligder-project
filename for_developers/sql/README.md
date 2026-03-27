@@ -35,6 +35,7 @@ For production, you can use `psql`, Supabase CLI migrations, or CI—what matter
 | [`014_ligder_technical_boards.sql`](014_ligder_technical_boards.sql) | **LIGDER TECHNICAL** section: Development & Technical Discussion. |
 | [`019_dividends_schema.sql`](019_dividends_schema.sql) | Dividends: 6-hour periods, admin deposits, per-wallet entitlements. |
 | [`020_forum_polls.sql`](020_forum_polls.sql) | Forum polls: one poll per post, options, signed ballots; API + Memo kinds `poll_create` / `poll_ballot`. |
+| [`021_liteboards.sql`](021_liteboards.sql) | **Liteboards**: per-SPL-mint mini forums (`liteboards`, one-time deploy codes, `liteboard_threads` / `liteboard_thread_posts`; announcement vs general). |
 
 ### Optional / destructive (not part of the main sequence)
 
