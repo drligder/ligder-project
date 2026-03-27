@@ -51,7 +51,7 @@ const ForumPage = () => {
   const navigate = useNavigate();
   const { publicKey } = useWallet();
   const { username, isRegistered, profileLoading } = useLigderProfile();
-  const { isAdmin } = useForumAccount();
+  const { isAdmin, isModerator } = useForumAccount();
   const showRegister = publicKey ? !profileLoading && !isRegistered : true;
 
   const [now, setNow] = useState(() => new Date());
@@ -336,7 +336,7 @@ const ForumPage = () => {
               <p className="text-sm text-gray-600 mb-6">No boards in this section yet.</p>
             )}
 
-            {canSeeGovernance || isAdmin ? (
+            {canSeeGovernance || isAdmin || isModerator ? (
               <>
                 <h2
                   className="text-base font-bold text-gray-900 mb-2 mt-8 border-b border-gray-400 pb-1 flex flex-wrap items-center gap-2"

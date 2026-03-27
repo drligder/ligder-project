@@ -16,7 +16,7 @@ const BOARD_BASE = '/forums/ligder-governance';
 const LigderGovernancePage = () => {
   const { publicKey } = useWallet();
   const { isRegistered, profileLoading } = useLigderProfile();
-  const { isAdmin } = useForumAccount();
+  const { isAdmin, isModerator } = useForumAccount();
   const showRegister = publicKey ? !profileLoading && !isRegistered : true;
 
   const [boards, setBoards] = useState<ForumBoardRow[]>([]);
@@ -89,10 +89,10 @@ const LigderGovernancePage = () => {
         <p className="text-sm text-gray-700 mb-4" style={{ fontFamily: 'Times New Roman, serif' }}>
           Governance proposals, treasury moves, and protocol changes. Holders need at least 0.25% of
           total supply (2,500,000 LITE).{' '}
-          {isAdmin ? (
+          {isAdmin || isModerator ? (
             <span className="font-semibold text-gray-900">
-              Your wallet is marked as administrator—you can read and post here without meeting that
-              holding requirement.
+              Your account is an administrator or moderator—you can read and post here without meeting
+              that holding requirement.
             </span>
           ) : null}
         </p>
