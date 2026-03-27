@@ -25,6 +25,9 @@ import {
   forumSectionLabelFromBase,
 } from '../lib/forumBoardBasePath';
 
+/** Opening post body limit; keep in sync with `FORUM_OP_BODY_MAX` in server/index.mjs */
+const FORUM_OP_BODY_MAX = 2500;
+
 const BoardThreadsPage = () => {
   const location = useLocation();
   const boardBase = forumBoardBaseFromPathname(location.pathname);
@@ -105,8 +108,11 @@ const BoardThreadsPage = () => {
       showToast('Opening post (body) is required.', 'error');
       return;
     }
-    if (body.length > 1000) {
-      showToast('Body is too long (max 1,000 characters).', 'error');
+    if (body.length > FORUM_OP_BODY_MAX) {
+      showToast(
+        `Body is too long (max ${FORUM_OP_BODY_MAX.toLocaleString()} characters).`,
+        'error'
+      );
       return;
     }
     const nonce = crypto.randomUUID();
@@ -396,7 +402,7 @@ const BoardThreadsPage = () => {
               value={newBody}
               onChange={setNewBody}
               placeholder="Opening post (supports Markdown: bold/italic/headers/lists)…"
-              maxLength={1000}
+              maxLength={FORUM_OP_BODY_MAX}
               disabled={creating}
             />
             <button

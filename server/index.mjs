@@ -836,7 +836,7 @@ function messageLooksLikeForumThreadReply(message, wallet) {
 }
 
 const FORUM_BOARD_ID_RE = /^[a-zA-Z0-9_-]{1,100}$/;
-const FORUM_OP_BODY_MAX = 1000;
+const FORUM_OP_BODY_MAX = 2500;
 const FORUM_REPLY_BODY_MAX = 30000;
 const FORUM_EDIT_BODY_MAX = 30000;
 const UUID_RE =
