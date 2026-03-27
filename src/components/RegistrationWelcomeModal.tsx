@@ -54,12 +54,11 @@ export function RegistrationWelcomeModal({ open, username, onClose }: Props) {
           up — no separate sign-in step.
         </p>
         <p className="text-sm text-gray-800 m-0 mb-4 leading-relaxed">
-          Before you post or start threads (when those features go live), please read the community
-          guidelines and board rules on the{' '}
-          <Link to="/" className="text-blue-800 underline hover:text-blue-950">
-            main Ligder page
-          </Link>
-          . They explain how wallet-linked accounts work here and what we expect in discussion.
+          You can now jump into the{' '}
+          <Link to="/forums" className="text-blue-800 underline hover:text-blue-950">
+            forums
+          </Link>{' '}
+          and start exploring.
         </p>
         <div className="flex justify-end" style={{ fontFamily: 'Arial, sans-serif' }}>
           <button
