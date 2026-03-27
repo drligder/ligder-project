@@ -38,10 +38,19 @@ export function ForumPollPanel({
   const [qDraft, setQDraft] = useState('');
   const [optsDraft, setOptsDraft] = useState('');
   const [multiDraft, setMultiDraft] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editQ, setEditQ] = useState('');
+  const [editOpts, setEditOpts] = useState('');
+  const [editMulti, setEditMulti] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     setLocalPoll(poll ?? null);
   }, [poll]);
+
+  useEffect(() => {
+    setShowEdit(false);
+  }, [poll?.id]);
 
   useEffect(() => {
     const ids = localPoll?.my_option_ids;
