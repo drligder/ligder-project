@@ -3,6 +3,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -25,10 +26,82 @@ function getPhantom() {
   return s?.isPhantom ? s : null;
 }
 
+function publicKeyToBase58(pk: unknown): string | null {
+  if (pk && typeof pk === 'object' && 'toBase58' in pk) {
+    const t = (pk as { toBase58?: () => string }).toBase58;
+    if (typeof t === 'function') {
+      try {
+        const s = t.call(pk);
+        return typeof s === 'string' && s.length > 0 ? s : null;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [publicKey, setPublicKey] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /** Keep React state in sync with Phantom after refresh / tab switch / account change */
+  useEffect(() => {
+    const provider = getPhantom();
+    if (!provider) return;
+
+    const readConnectedPk = (): string | null => {
+      const pk = publicKeyToBase58(provider.publicKey);
+      if (!pk) return null;
+      if (provider.isConnected === false) return null;
+      return pk;
+    };
+
+    const syncFromExtension = () => {
+      setPublicKey(readConnectedPk());
+    };
+
+    const initialPk = readConnectedPk();
+    if (initialPk) {
+      setPublicKey(initialPk);
+    } else {
+      void (async () => {
+        try {
+          const resp = await provider.connect({ onlyIfTrusted: true });
+          const pk =
+            publicKeyToBase58(resp.publicKey) ??
+            (typeof resp.publicKey === 'object' && resp.publicKey != null
+              ? String(resp.publicKey)
+              : null);
+          if (pk) setPublicKey(pk);
+        } catch {
+          /* not linked yet or user rejected a prior session */
+        }
+      })();
+    }
+
+    const onConnect = () => syncFromExtension();
+    const onDisconnect = () => setPublicKey(null);
+    const onAccountChanged = (next?: unknown) => {
+      if (next == null) {
+        setPublicKey(null);
+        return;
+      }
+      const pk = publicKeyToBase58(next);
+      if (pk) setPublicKey(pk);
+    };
+
+    provider.on?.('connect', onConnect);
+    provider.on?.('disconnect', onDisconnect);
+    provider.on?.('accountChanged', onAccountChanged);
+
+    return () => {
+      provider.removeListener?.('connect', onConnect);
+      provider.removeListener?.('disconnect', onDisconnect);
+      provider.removeListener?.('accountChanged', onAccountChanged);
+    };
+  }, []);
 
   const clearError = useCallback(() => setError(null), []);
 
