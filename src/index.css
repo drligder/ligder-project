@@ -1,0 +1,507 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Forum member ranks (post sidebar) — primary: public/fonts/mini_pixel-7.ttf */
+@font-face {
+  font-family: 'Mini Pixel 7';
+  src: url('/fonts/mini_pixel-7.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Wordmark: homepage hero + author card name */
+.ligder-pixel-title {
+  font-family: 'Mini Pixel 7', ui-monospace, monospace;
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: 0.04em;
+}
+
+.ligder-pixel-title--hero {
+  font-size: clamp(2rem, 8vw, 3.25rem);
+  line-height: 1.15;
+}
+
+@font-face {
+  font-family: 'Gargouillette';
+  src: url('/fonts/Gargouillette.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Academic Typography */
+.prose-academic {
+  font-family: 'Times New Roman', serif;
+  line-height: 1.7;
+  color: #1f2937;
+  text-align: left;
+  font-size: 1.0625rem;
+}
+
+.section-header {
+  font-family: Arial, sans-serif;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #000000;
+  margin-bottom: 1.25rem;
+  margin-top: 0;
+  border-bottom: 1px solid #d1d5db;
+  padding-bottom: 0.5rem;
+  text-align: left;
+}
+
+.academic-text {
+  margin-bottom: 0;
+  margin-top: 0;
+  text-align: left;
+  text-indent: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* Space between substantive paragraphs only (fewer, larger blocks) */
+.prose-academic .academic-text + .academic-text {
+  margin-top: 1.75rem;
+}
+
+.final-statement {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #d1d5db;
+  font-style: italic;
+}
+
+/* Image Placeholders */
+.image-placeholder {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+.placeholder-box {
+  border: 2px solid #6b7280;
+  background-color: #f9fafb;
+  padding: 3rem 2rem;
+  margin: 1rem auto;
+  max-width: 600px;
+}
+
+.placeholder-text {
+  font-family: Arial, sans-serif;
+  font-size: 0.9rem;
+  color: #4b5563;
+  font-style: italic;
+  margin: 0;
+}
+
+/* Figure Images */
+.figure-image {
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  display: block;
+}
+
+.figure-caption {
+  font-family: Arial, sans-serif;
+  font-size: 0.9rem;
+  color: #4b5563;
+  font-style: italic;
+  margin: 0.5rem 0 0 0;
+  text-align: center;
+}
+
+/* Mathematical Notes */
+.mathematical-note {
+  background-color: #f8fafc;
+  border-left: 4px solid #1e3a8a;
+  padding: 1rem;
+  margin: 2rem 0;
+}
+
+.math-text {
+  font-family: 'Times New Roman', serif;
+  font-size: 0.95rem;
+  color: #000000;
+  margin: 0;
+}
+
+/* Footnotes */
+.footnotes {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.footnote {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+  text-indent: 0;
+}
+
+.footnote sup {
+  color: #1e3a8a;
+  font-weight: bold;
+}
+
+/* Author Card */
+.author-card {
+  position: relative;
+  margin: 2rem 0;
+  border: 1px solid #d1d5db;
+  background-color: #f8fafc;
+  padding: 2rem;
+}
+
+.social-links {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-family: 'Times New Roman', serif;
+  font-size: 1rem;
+}
+
+.social-link {
+  color: #1d4ed8; /* Tailwind blue-700 */
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.social-link:hover {
+  color: #1e3a8a; /* Tailwind blue-900 */
+}
+
+.social-separator {
+  margin: 0 0.5rem;
+  color: #6b7280;
+}
+
+.author-layout {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+.author-photo-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 150px;
+}
+
+.author-photo-socials {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.author-social-icon {
+  color: #1d4ed8;
+  line-height: 0;
+  transition: color 0.2s ease;
+}
+
+.author-social-icon:hover {
+  color: #1e3a8a;
+}
+
+.author-social-vsep {
+  width: 1px;
+  height: 1.5rem;
+  background-color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.author-photo {
+  /* Photo column styling */
+}
+
+.photo-placeholder {
+  width: 150px;
+  height: 150px;
+  border: 2px solid #6b7280;
+  background-color: #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.photo-text {
+  font-family: 'Times New Roman', serif;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #374151;
+  margin: 0;
+}
+
+.photo-subtext {
+  font-family: Arial, sans-serif;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0.25rem 0 0 0;
+}
+
+.author-portrait {
+  width: 150px;
+  height: 150px;
+  border: 2px solid #6b7280;
+  object-fit: cover;
+  display: block;
+}
+
+.author-info {
+  /* Info column styling */
+}
+
+.author-name {
+  font-family: 'Mini Pixel 7', ui-monospace, monospace;
+  font-size: 1.875rem;
+  font-weight: normal;
+  color: #000000;
+  margin: 0 0 0.5rem 0;
+  text-align: left;
+  letter-spacing: 0.04em;
+}
+
+.author-title {
+  font-family: Arial, sans-serif;
+  font-size: 1rem;
+  color: #4b5563;
+  margin: 0 0 1.5rem 0;
+  font-style: italic;
+  text-align: left;
+}
+
+.author-bio {
+  /* Bio section styling */
+}
+
+.bio-paragraph {
+  font-family: 'Times New Roman', serif;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: #374151;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.final-bio {
+  font-style: italic;
+  font-weight: 500;
+  color: #1e3a8a;
+  margin-bottom: 0;
+}
+
+/* Token address card */
+.token-address-block {
+  margin: 0.1rem 0 0.75rem 0;
+}
+
+.token-address-label {
+  font-size: 0.78rem;
+  color: #4b5563;
+  margin-bottom: 0.28rem;
+}
+
+.token-address-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0.38rem 0.6rem;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.token-address-value {
+  font-family: 'Times New Roman', serif;
+  font-size: 0.85rem;
+  color: #111827;
+  word-break: break-all;
+}
+
+.token-copy-button {
+  color: #1d4ed8; /* blue-700 */
+  text-decoration: underline;
+  background: transparent;
+  border: none;
+  font-family: Arial, sans-serif;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.token-copy-button:hover:not(:disabled) {
+  color: #1e3a8a; /* blue-900 */
+}
+
+.token-copy-button:disabled {
+  color: #6b7280;
+  text-decoration: none;
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+/* Forums (bitcointalk-style tables) */
+.forum-table-wrap {
+  overflow-x: auto;
+}
+
+.forum-table-head {
+  background: #e5e7eb;
+  font-family: Arial, sans-serif;
+  font-size: 0.8rem;
+  color: #111827;
+}
+
+.forum-table-row:hover {
+  background: #f9fafb !important;
+}
+
+/* Board index tables: fixed columns shared across Ligder Official / General / Technical */
+.forum-boards-table {
+  table-layout: fixed;
+}
+
+/* Thread view: sample + future real threads (see components/forum/) */
+.forum-thread {
+  background: #fff;
+}
+
+.forum-rank {
+  font-family: 'Mini Pixel 7', 'Gargouillette', Arial, sans-serif;
+  letter-spacing: 0.02em;
+}
+
+/* Register page: compact step panels (scroll if content grows) */
+.register-step-card {
+  max-height: 11rem;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Bibliography */
+.bibliography {
+  margin-top: 1.5rem;
+}
+
+.bib-entry {
+  margin-bottom: 1rem;
+  text-indent: -2rem;
+  padding-left: 2rem;
+  font-size: 0.95rem;
+}
+
+/* Index */
+.index-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.index-column {
+  /* Column styling handled by grid */
+}
+
+.index-entry {
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+  text-indent: 0;
+}
+
+.index-entry strong {
+  color: #1e3a8a;
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+  
+  .prose-academic {
+    color: black !important;
+  }
+  
+  .section-header {
+    color: black !important;
+    page-break-after: avoid;
+  }
+  
+  .academic-text {
+    text-align: justify;
+    orphans: 3;
+    widows: 3;
+  }
+  
+  .image-placeholder {
+    page-break-inside: avoid;
+  }
+  
+  .mathematical-note {
+    background: #f5f5f5 !important;
+    border-left: 2px solid black !important;
+    page-break-inside: avoid;
+  }
+  
+  .footnotes {
+    font-size: 10pt;
+  }
+  
+  nav, .search-box, .author-card {
+    display: none;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .author-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    text-align: left;
+  }
+
+  .author-photo {
+    justify-self: center;
+  }
+  
+  .photo-placeholder {
+    margin: 0 auto;
+  }
+  
+  .prose-academic {
+    font-size: 1rem;
+  }
+  
+  .section-header {
+    font-size: 1.3rem;
+  }
+  
+  .index-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .placeholder-box {
+    padding: 2rem 1rem;
+  }
+}

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ligder Gazette — Governance, LITE &amp; the Forum</title>
+    <style>
+        @font-face {
+            font-family: 'Mini Pixel 7';
+            src: url('/fonts/mini_pixel-7.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Gargouillette';
+            src: url('/fonts/Gargouillette.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.7;
+            color: #1f2937;
+            background: #f3f4f6;
+            padding: 24px 16px 48px;
+        }
+
+        .container {
+            max-width: 820px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 0;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e5e7eb;
+        }
+
+        .banner-wrap {
+            text-align: center;
+            padding: 28px 20px 12px;
+            background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .banner-wrap img {
+            max-width: min(100%, 28rem);
+            height: auto;
+            image-rendering: auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 28px 32px 32px;
+            border-bottom: 1px solid #d1d5db;
+        }
+
+        .title-pixel {
+            font-family: 'Mini Pixel 7', ui-monospace, monospace;
+            font-weight: normal;
+            letter-spacing: 0.04em;
+            font-size: clamp(1.35rem, 4vw, 2rem);
+            line-height: 1.2;
+            color: #111827;
+            margin-bottom: 12px;
+        }
+
+        .title-sub {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 0.9375rem;
+            color: #4b5563;
+            line-height: 1.65;
+            max-width: 38rem;
+            margin: 0 auto;
+        }
+
+        .metadata {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #6b7280;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .body-pad {
+            padding: 0 40px 48px;
+        }
+
+        @media (max-width: 640px) {
+            .body-pad {
+                padding: 0 20px 36px;
+            }
+        }
+
+        h2 {
+            font-family: 'Mini Pixel 7', ui-monospace, monospace;
+            font-size: 1.0625rem;
+            font-weight: normal;
+            letter-spacing: 0.06em;
+            margin-top: 2.25rem;
+            margin-bottom: 1rem;
+            color: #111827;
+            border-bottom: 1px solid #d1d5db;
+            padding-bottom: 0.5rem;
+            text-align: left;
+        }
+
+        h2:first-of-type {
+            margin-top: 0;
+        }
+
+        h3 {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 0.95rem;
+            font-weight: bold;
+            margin-top: 1.75rem;
+            margin-bottom: 0.75rem;
+            color: #111827;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            text-align: left;
+        }
+
+        .abstract {
+            background: #f9fafb;
+            padding: 1.5rem 1.25rem;
+            margin: 0 0 1.75rem;
+            border-left: 4px solid #1f2937;
+            font-style: italic;
+            color: #374151;
+        }
+
+        .abstract strong {
+            font-style: normal;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 0.85rem;
+            letter-spacing: 0.02em;
+        }
+
+        .info-box {
+            background: #fffbeb;
+            padding: 1.25rem;
+            margin: 1.5rem 0;
+            border: 1px solid #d1d5db;
+        }
+
+        .info-box strong {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 0.875rem;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding-left: 0;
+            margin-top: 0.75rem;
+        }
+
+        .info-box li {
+            padding: 0.5rem 0;
+            border-bottom: 1px dashed #e5e7eb;
+            font-size: 0.9375rem;
+        }
+
+        .info-box li:last-child {
+            border-bottom: none;
+        }
+
+        .formula {
+            background: #f3f4f6;
+            padding: 14px 16px;
+            margin: 1.25rem 0;
+            font-family: ui-monospace, 'Courier New', monospace;
+            font-size: 0.875rem;
+            border-left: 3px solid #9ca3af;
+            overflow-x: auto;
+        }
+
+        .note {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        .warning {
+            background: #fef2f2;
+            padding: 1.25rem;
+            margin: 1.5rem 0;
+            border: 1px solid #d1d5db;
+            border-left: 4px solid #b91c1c;
+        }
+
+        .warning-title {
+            font-family: Arial, Helvetica, sans-serif;
+            font-weight: bold;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            color: #991b1b;
+        }
+
+        .footer {
+            margin-top: 2.5rem;
+            padding-top: 1.75rem;
+            border-top: 1px solid #d1d5db;
+            text-align: center;
+            font-style: italic;
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+
+        .footer .sig {
+            font-family: 'Gargouillette', 'Times New Roman', serif;
+            font-style: normal;
+            font-size: 1.1rem;
+            color: #374151;
+            margin-top: 0.75rem;
+        }
+
+        .links-box {
+            margin-top: 1.75rem;
+            padding: 1.25rem;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            text-align: left;
+        }
+
+        .links-box h3 {
+            margin-top: 0;
+            font-family: 'Mini Pixel 7', ui-monospace, monospace;
+            font-weight: normal;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+
+        .links-box p {
+            margin-bottom: 0.5rem;
+            font-size: 0.9375rem;
+        }
+
+        a {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+
+        a:hover {
+            color: #1e3a8a;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #e5e7eb;
+            margin: 2rem 0;
+        }
+
+        ul.plain {
+            margin: 0.75rem 0 1rem 1.25rem;
+        }
+
+        ul.plain li {
+            margin-bottom: 0.35rem;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                border: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="banner-wrap">
+            <img src="/images/readmore.png" alt="" />
+        </div>
+
+        <div class="header">
+            <p class="title-sub">Ligder Gazette</p>
+            <h1 class="title-pixel">Governance, LITE &amp; the forum</h1>
+            <p class="subtitle">
+                A short paper on how Ligder ties a Solana token to an oldschool forum: wallet-native identity,
+                stake-weighted voice, on-chain attestations where we relay them, and a stack you can read and fork.
+            </p>
+            <div class="metadata">
+                Living document · Solana · LITE governance token · Open source
+            </div>
+        </div>
+
+        <div class="body-pad">
+            <div class="abstract">
+                <strong>Abstract</strong><br><br>
+                Ligder is built on a simple premise: the best projects are the ones where the community actually
+                matters. We pair a governance token (<strong>LITE</strong>) with a stratified forum—think bitcointalk
+                with wallets. You register with a single sign message; we read your LITE balance on-chain and show it
+                on your profile and beside your posts. The forum is not flat: casual boards stay open; governance and
+                treasury-facing discussion sit behind thresholds. Where we relay them, new threads and replies are
+                attested on Solana Memo so hashes can be checked against what you see; full bodies stay in the database
+                for speed and search. Nothing here is meant to be opaque: the repo is public, and the dividend-claim path
+                for pool fees is there for anyone to verify.
+            </div>
+
+            <div class="info-box">
+                <strong>At a glance</strong>
+                <ul>
+                    <li><strong>Network:</strong> Solana</li>
+                    <li><strong>Governance token:</strong> LITE (mint configured in deployment)</li>
+                    <li><strong>Identity:</strong> Phantom (or compatible) wallet + optional username registration</li>
+                    <li><strong>Forum:</strong> Sections, boards, markdown, per-board minimum rank for threads/replies</li>
+                    <li><strong>Code:</strong> Open source—fork, tune config, ship your own deployment</li>
+                </ul>
+            </div>
+
+            <h2>I. Why a forum</h2>
+            <p>
+                Back in 2013, many of us had one thing: a forum and an idea. No roadmap theatre—just people arguing,
+                disagreeing, and building. Ligder is that spirit on Solana: your wallet is your identity, and your LITE
+                balance is how much weight you carry in the room. The more you hold, the more representable you are in
+                the tiers that matter for governance—not in a backroom, but in threads and votes that line up with what
+                the chain already knows about commitment.
+            </p>
+
+            <h2>II. Registration &amp; balance</h2>
+            <p>
+                Registration uses a <strong>sign message</strong> flow—no custody, no broad token permissions beyond what
+                you approve for that signature. The app reads your <strong>LITE balance</strong> on-chain and stores it
+                with your profile; that balance appears under your posts so alignment is visible. We do not ask for your
+                other assets or your keys; we show what the chain shows for LITE.
+            </p>
+
+            <h2>III. Forum structure</h2>
+            <p>
+                Boards are grouped into sections (official, general, technical, governance, and so on). Each board can
+                set minimum LITE holdings to start threads or to reply. Post voting (up and down) lives with the forum
+                data model. Governance-heavy and treasury-facing rooms stay behind thresholds so casual discussion
+                stays cheap while serious decisions meet a higher bar.
+            </p>
+            <p class="note">
+                The live board list and rules are always those shown in the app under
+                <a href="/forums">Forums</a>.
+            </p>
+
+            <h2>IV. On-chain attestations &amp; archive</h2>
+            <p>
+                Where the stack relays them, <strong>new threads and replies are attested on-chain</strong> via Solana Memo
+                (hashes align with what you read in the UI). Full post bodies remain in the database for latency and
+                search. The <a href="/forums/archive">Archive &amp; Verify</a> flow is there so anyone can compare chain
+                commitments with forum content. If something does not match, you can see it—not because we promise
+                perfection, but because the design assumes verification.
+            </p>
+
+            <h2>V. Fees, dividends &amp; verification</h2>
+            <p>
+                Liquidity-pool fees flow into a dividend-claim system: the plumbing is in the repo so holders and
+                auditors can trace how pool fees become claims for LITE holders. Treat every number in the UI as
+                something you can reconcile against on-chain configuration and the published code—not as a marketing
+                curve.
+            </p>
+
+            <h2>VI. What we do not claim</h2>
+            <div class="warning">
+                <div class="warning-title">Read carefully</div>
+                <p style="margin-bottom: 0.75rem;">
+                    Ligder is experimental software. Token price, liquidity, and third-party infrastructure are outside
+                    this document. Nothing here is investment, legal, or tax advice.
+                </p>
+                <ul class="plain">
+                    <li>Smart contracts and deployments can have bugs; audits do not guarantee safety.</li>
+                    <li>Governance outcomes depend on participation and on-chain reality, not this HTML file.</li>
+                    <li>RPC endpoints, wallets, and bridges can fail or behave unexpectedly.</li>
+                </ul>
+            </div>
+
+            <h2>VII. Conclusion</h2>
+            <p>
+                Ligder is a toolkit for communities that want to own governance: no VC carve-out, no team allocation
+                story in this design—just holders, a forum, and code you can inspect. The Gazette is not a contract;
+                it is orientation. If the implementation drifts, the repository and the chain win over this page.
+            </p>
+            <p>
+                <strong>Ship honestly. Argue in public. Let the chain and the repo be the referee.</strong>
+            </p>
+
+            <hr>
+
+            <div class="links-box">
+                <h3>Links</h3>
+                <p><a href="/">Ligder home</a> · <a href="/forums">Forums</a> · <a href="/forums/archive">Archive &amp; Verify</a></p>
+                <p class="note" style="margin-bottom: 0;">Source code: see the project repository for contracts, API, and frontend.</p>
+            </div>
+
+            <div class="footer">
+                <p>Ligder Gazette — orientation, not a prospectus.</p>
+                <p class="sig">LITE · Solana · forum-first governance</p>
+                <p style="margin-top: 1rem; font-size: 0.8rem;">
+                    This document may be updated as the deployment and parameters evolve. Prefer the app and the repo for authoritative behavior.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

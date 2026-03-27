@@ -1,0 +1,9 @@
+# Netlify injects [build.environment] into the build — fixes VITE_API_BASE missing when the UI
+# variable is not scoped to Builds (see Site settings → Environment variables → Scopes).
+# Update the URL if your Railway hostname changes.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  VITE_API_BASE = "https://ligder-project-production.up.railway.app"
