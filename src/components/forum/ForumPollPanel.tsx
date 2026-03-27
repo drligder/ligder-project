@@ -237,8 +237,8 @@ export function ForumPollPanel({
     >
       {isGovernanceBoard ? (
         <p className="text-[0.72rem] text-gray-600 m-0 mb-2" style={{ fontFamily: 'Times New Roman, serif' }}>
-          Ligder Governance: creating polls and voting requires ≥ 0.25% of supply (2,500,000 LITE) or
-          admin.
+          Ligder Governance: creating polls and voting requires ≥ 0.25% of supply (2,500,000 LITE), or
+          admin/moderator.
         </p>
       ) : null}
 

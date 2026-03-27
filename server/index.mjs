@@ -1099,12 +1099,29 @@ function isGovernanceSectionName(section) {
 async function hasGovernanceAccessForWallet(walletOk) {
   if (!walletOk) return false;
   try {
-    const { data: prof } = await supabase
+    let prof = null;
+    const pr = await supabase
       .from('profiles')
-      .select('is_admin')
+      .select('is_admin, is_moderator')
       .eq('wallet', walletOk)
       .maybeSingle();
+    if (pr.error && supabaseErrorMissingColumn(pr.error, 'is_moderator')) {
+      const pr2 = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('wallet', walletOk)
+        .maybeSingle();
+      if (pr2.error) throw pr2.error;
+      prof = pr2.data ? { ...pr2.data, is_moderator: false } : null;
+    } else if (pr.error) {
+      throw pr.error;
+    } else {
+      prof = pr.data
+        ? { ...pr.data, is_moderator: pr.data.is_moderator === true }
+        : null;
+    }
     if (prof?.is_admin === true) return true;
+    if (prof?.is_moderator === true) return true;
   } catch {
     // continue with holder check
   }
@@ -3828,7 +3845,7 @@ app.post('/api/forum/polls', async (req, res) => {
     if (!allowGovPoll) {
       return res.status(403).json({
         error:
-          'Governance board polls require >= 0.25% supply holdings (2,500,000 LITE) or admin.',
+          'Governance board polls require >= 0.25% supply holdings (2,500,000 LITE), or admin/moderator.',
       });
     }
   }
@@ -4047,7 +4064,7 @@ app.post('/api/forum/poll-ballots', async (req, res) => {
     if (!allowPb) {
       return res.status(403).json({
         error:
-          'Governance board polls require >= 0.25% supply holdings (2,500,000 LITE) or admin.',
+          'Governance board polls require >= 0.25% supply holdings (2,500,000 LITE), or admin/moderator.',
       });
     }
   }
@@ -4188,7 +4205,7 @@ app.get('/api/forum/boards', async (req, res) => {
       if (isGovernanceSectionName(section)) {
         return res.status(403).json({
           error:
-            'Governance section requires >= 0.25% supply holdings (2,500,000 LITE).',
+            'Governance section requires >= 0.25% supply holdings (2,500,000 LITE), or admin/moderator.',
         });
       }
       boards = boards.filter((b) => !isGovernanceSectionName(b.section));
@@ -4281,7 +4298,7 @@ app.get('/api/forum/boards/:slug/threads', async (req, res) => {
     if (!allowGovernance) {
       return res.status(403).json({
         error:
-          'Governance board requires >= 0.25% supply holdings (2,500,000 LITE).',
+          'Governance board requires >= 0.25% supply holdings (2,500,000 LITE), or admin/moderator.',
       });
     }
   }
@@ -4414,7 +4431,7 @@ app.post('/api/forum/threads', async (req, res) => {
     if (!allowGovernance) {
       return res.status(403).json({
         error:
-          'Governance board requires >= 0.25% supply holdings (2,500,000 LITE).',
+          'Governance board requires >= 0.25% supply holdings (2,500,000 LITE), or admin/moderator.',
       });
     }
   }
@@ -4645,7 +4662,7 @@ app.get('/api/forum/boards/:slug/threads/:threadNum', async (req, res) => {
     if (!allowGovernance) {
       return res.status(403).json({
         error:
-          'Governance board requires >= 0.25% supply holdings (2,500,000 LITE).',
+          'Governance board requires >= 0.25% supply holdings (2,500,000 LITE), or admin/moderator.',
       });
     }
   }
@@ -4845,7 +4862,7 @@ app.post('/api/forum/thread-replies', async (req, res) => {
     if (!allowGovernance) {
       return res.status(403).json({
         error:
-          'Governance board requires >= 0.25% supply holdings (2,500,000 LITE).',
+          'Governance board requires >= 0.25% supply holdings (2,500,000 LITE), or admin/moderator.',
       });
     }
   }

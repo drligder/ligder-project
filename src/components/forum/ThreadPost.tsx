@@ -139,6 +139,8 @@ export function ThreadPost({
   onAdminBanUser,
   viewerCanEdit = false,
   onEditPost,
+  isGovernanceBoard = false,
+  onThreadPollsRefresh,
 }: ThreadPostProps) {
   const stripe = index1Based % 2 === 1 ? 'bg-white' : 'bg-gray-50';
   const liteLabel = formatLiteHoldings(post.liteHoldingsUi ?? null);
