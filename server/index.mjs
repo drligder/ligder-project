@@ -1001,6 +1001,24 @@ function coerceLoadedAddressPk(x) {
   }
 }
 
+/** Same account order as `MessageAccountKeys`: static, then lookup writable, then lookup readonly. */
+function mergeRequiredSignersManualStaticPlusLoaded(message, meta, set) {
+  if (!message?.staticAccountKeys || !message?.header) return;
+  const nReq = message.header.numRequiredSignatures ?? 0;
+  if (nReq <= 0) return;
+  const la = meta?.loadedAddresses;
+  const w = (la?.writable ?? []).map(coerceLoadedAddressPk).filter(Boolean);
+  const r = (la?.readonly ?? []).map(coerceLoadedAddressPk).filter(Boolean);
+  const full = [...message.staticAccountKeys, ...w, ...r];
+  for (let i = 0; i < nReq && i < full.length; i++) {
+    try {
+      set.add(full[i].toBase58());
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 /**
  * Merge first `header.numRequiredSignatures` accounts from the decoded message.
  * v0 + ALTs require `meta.loadedAddresses` (Bonk / pump-style launchpads).
@@ -1026,6 +1044,7 @@ function mergeRequiredSignersFromDecodedMessage(message, meta, set) {
           nFromLookups,
           got: writable.length + readonly.length,
         });
+        mergeRequiredSignersManualStaticPlusLoaded(message, meta, set);
         return;
       }
       keys = message.getAccountKeys({
@@ -1041,6 +1060,28 @@ function mergeRequiredSignersFromDecodedMessage(message, meta, set) {
     }
   } catch (e) {
     console.error('liteboard: mergeRequiredSignersFromDecodedMessage', e);
+    mergeRequiredSignersManualStaticPlusLoaded(message, meta, set);
+  }
+}
+
+/**
+ * jsonParsed `message` often has no `header`; some RPCs set `signer: false` on ALT-resolved keys.
+ * Required signers are always the first `numRequiredSignatures` accounts in message order — use `nReq`
+ * from the raw decoded tx when present.
+ */
+function mergePositionalRequiredSignersFromParsed(parsed, rawTx, set) {
+  const nReq =
+    rawTx?.transaction?.message?.header?.numRequiredSignatures ??
+    parsed?.transaction?.message?.header?.numRequiredSignatures ??
+    0;
+  const keys = parsed?.transaction?.message?.accountKeys;
+  if (typeof nReq !== 'number' || nReq <= 0 || !Array.isArray(keys)) return;
+  const cap = Math.min(nReq, keys.length);
+  for (let i = 0; i < cap; i++) {
+    const pk = keys[i]?.pubkey;
+    if (!pk) continue;
+    const s = typeof pk === 'string' ? pk : pk.toBase58?.();
+    if (s) set.add(s);
   }
 }
 
@@ -1103,9 +1144,11 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
   const mintCanonical = mintPk.toBase58();
 
   let mintOk = false;
+  /** @type {{ mintAuthority: PublicKey | null; freezeAuthority: PublicKey | null } | null} */
+  let mintInfo = null;
   for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
     try {
-      await getMint(dividendsConnection, mintPk, 'confirmed', programId);
+      mintInfo = await getMint(dividendsConnection, mintPk, 'confirmed', programId);
       mintOk = true;
       break;
     } catch {
@@ -1165,6 +1208,7 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
       signers
     );
   }
+  mergePositionalRequiredSignersFromParsed(parsed, rawTx, signers);
   if (signers.size === 0) {
     return {
       ok: false,
@@ -1172,10 +1216,15 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
     };
   }
   if (!signers.has(walletBase58)) {
+    const ma = mintInfo?.mintAuthority?.toBase58?.();
+    const fa = mintInfo?.freezeAuthority?.toBase58?.();
+    if (ma === walletBase58 || fa === walletBase58) {
+      return { ok: true, mint: mintCanonical };
+    }
     return {
       ok: false,
       error:
-        'Connected wallet did not sign the mint’s earliest on-chain transaction (must be fee payer or a required signer—e.g. launchpad relayers pay fees while you still sign).',
+        'Connected wallet did not sign the mint’s earliest on-chain transaction (must be fee payer or a required signer—e.g. launchpad relayers pay fees while you still sign). If mint/freeze authority was revoked, the wallet that still signs on-chain must match; Solscan “creator” can differ from tx signers.',
     };
   }
 
