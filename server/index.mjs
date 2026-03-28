@@ -984,14 +984,75 @@ function parsedTransactionFeePayerBase58(tx) {
   return null;
 }
 
-/** All wallets that signed this tx (fee payer + required-signer accounts). Launchpads may use a relayer fee payer. */
+function coerceLoadedAddressPk(x) {
+  if (!x) return null;
+  if (x instanceof PublicKey) return x;
+  if (typeof x === 'string') {
+    try {
+      return new PublicKey(x);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    return new PublicKey(x);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Merge first `header.numRequiredSignatures` accounts from the decoded message.
+ * v0 + ALTs require `meta.loadedAddresses` (Bonk / pump-style launchpads).
+ */
+function mergeRequiredSignersFromDecodedMessage(message, meta, set) {
+  if (!message || typeof message.getAccountKeys !== 'function') return;
+  const la = meta?.loadedAddresses;
+  const hasLookups = (message.addressTableLookups?.length ?? 0) > 0;
+  try {
+    let keys;
+    if (hasLookups) {
+      const writable = (la?.writable ?? []).map(coerceLoadedAddressPk).filter(Boolean);
+      const readonly = (la?.readonly ?? []).map(coerceLoadedAddressPk).filter(Boolean);
+      const nFromLookups =
+        typeof message.numAccountKeysFromLookups === 'number'
+          ? message.numAccountKeysFromLookups
+          : null;
+      if (
+        nFromLookups != null &&
+        writable.length + readonly.length !== nFromLookups
+      ) {
+        console.error('liteboard: loadedAddresses vs message lookup count mismatch', {
+          nFromLookups,
+          got: writable.length + readonly.length,
+        });
+        return;
+      }
+      keys = message.getAccountKeys({
+        accountKeysFromLookups: { writable, readonly },
+      });
+    } else {
+      keys = message.getAccountKeys();
+    }
+    const nReq = message.header?.numRequiredSignatures ?? 0;
+    for (let i = 0; i < nReq && i < keys.length; i++) {
+      const pk = keys.get(i);
+      if (pk) set.add(pk.toBase58());
+    }
+  } catch (e) {
+    console.error('liteboard: mergeRequiredSignersFromDecodedMessage', e);
+  }
+}
+
+/** Parsed jsonParsed tx: `message` is a plain object (no getAccountKeys). Raw getTransaction fills ALTs. */
 function parsedTransactionRequiredSignerPubkeysSet(tx) {
   /** @type {Set<string>} */
   const set = new Set();
-  const fp = parsedTransactionFeePayerBase58(tx);
-  if (fp) set.add(fp);
   const m = tx?.transaction?.message;
   if (!m) return set;
+
+  const fp = parsedTransactionFeePayerBase58(tx);
+  if (fp) set.add(fp);
 
   if (Array.isArray(m.accountKeys)) {
     for (const k of m.accountKeys) {
@@ -1007,11 +1068,13 @@ function parsedTransactionRequiredSignerPubkeysSet(tx) {
   }
 
   const nReq = m.header?.numRequiredSignatures;
+  const lookupCount = m.addressTableLookups?.length ?? 0;
   if (
     typeof nReq === 'number' &&
     nReq > 0 &&
     Array.isArray(m.staticAccountKeys) &&
-    m.staticAccountKeys.length > 0
+    m.staticAccountKeys.length > 0 &&
+    lookupCount === 0
   ) {
     const cap = Math.min(nReq, m.staticAccountKeys.length);
     for (let i = 0; i < cap; i++) {
@@ -1068,12 +1131,17 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
     return { ok: false, error: 'No on-chain history found for this mint address.' };
   }
 
+  const txOpts = {
+    maxSupportedTransactionVersion: 0,
+    commitment: 'confirmed',
+  };
   let parsed;
+  let rawTx;
   try {
-    parsed = await dividendsConnection.getParsedTransaction(oldestSig, {
-      maxSupportedTransactionVersion: 0,
-      commitment: 'confirmed',
-    });
+    [parsed, rawTx] = await Promise.all([
+      dividendsConnection.getParsedTransaction(oldestSig, txOpts),
+      dividendsConnection.getTransaction(oldestSig, txOpts),
+    ]);
   } catch (e) {
     console.error(e);
     return {
@@ -1090,6 +1158,13 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
   }
 
   const signers = parsedTransactionRequiredSignerPubkeysSet(parsed);
+  if (rawTx?.transaction?.message) {
+    mergeRequiredSignersFromDecodedMessage(
+      rawTx.transaction.message,
+      rawTx.meta,
+      signers
+    );
+  }
   if (signers.size === 0) {
     return {
       ok: false,
