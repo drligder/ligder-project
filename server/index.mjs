@@ -19,6 +19,10 @@ import {
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
 } from '@solana/spl-token';
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
+import { mplTokenMetadata, fetchDigitalAsset } from '@metaplex-foundation/mpl-token-metadata';
+import { fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
+import { unwrapOption } from '@metaplex-foundation/umi-options';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 
@@ -1198,8 +1202,25 @@ async function loadLiteboardMintTxSigners(connection, sig, txOpts) {
 }
 
 /**
- * Liteboard deploy: wallet must sign a **creation-relevant** mint tx (global oldest, or SPL
- * initializeMint* for this mint among the oldest txs), or still hold mint/freeze authority.
+ * Matches how explorers label “creator”: Metaplex Token Metadata update authority or any
+ * entry in the creators vec (verified or not — many launchpads skip on-chain verification).
+ */
+async function walletMatchesMetaplexTokenMetadata(connection, mintPk, walletCanon) {
+  try {
+    const umi = createUmi(connection).use(mplTokenMetadata());
+    const asset = await fetchDigitalAsset(umi, fromWeb3JsPublicKey(mintPk));
+    if (String(asset.metadata.updateAuthority) === walletCanon) return true;
+    const creators = unwrapOption(asset.metadata.creators);
+    if (!Array.isArray(creators)) return false;
+    return creators.some((c) => String(c.address) === walletCanon);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Liteboard deploy: Metaplex metadata (creator / update authority), creation-relevant mint txs,
+ * or current mint/freeze authority.
  */
 async function assertWalletIsMintCreator(walletBase58, mintInput) {
   let walletCanon;
@@ -1235,6 +1256,16 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
       error:
         'Could not read this mint on-chain (check RPC network or SPL token program).',
     };
+  }
+
+  if (
+    await walletMatchesMetaplexTokenMetadata(
+      dividendsConnection,
+      mintPk,
+      walletCanon
+    )
+  ) {
+    return { ok: true, mint: mintCanonical };
   }
 
   let candidateSigs;
@@ -1282,7 +1313,7 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
   return {
     ok: false,
     error:
-      'Could not verify you created this mint: your wallet did not sign the oldest mint transactions we checked, or an SPL initializeMint for this mint, and you are not the current mint/freeze authority. Connect the wallet that signed the launch transaction (launchpads often use a relayer fee payer).',
+      'Could not verify creator for this mint. We accept: (1) Metaplex metadata update authority or a listed creator wallet, (2) signing the earliest relevant on-chain mint transactions, or (3) current mint/freeze authority. Use the wallet explorers show as creator/update authority, or the one that signed the launch (not always the fee payer).',
   };
 }
 
