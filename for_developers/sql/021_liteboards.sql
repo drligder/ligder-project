@@ -10,7 +10,7 @@ create table if not exists public.liteboards (
 
 create index if not exists liteboards_owner_idx on public.liteboards (owner_wallet);
 
-comment on table public.liteboards is 'Community mini-board keyed by SPL mint; owner_wallet matched mint creator (fee payer of first tx) at deploy.';
+comment on table public.liteboards is 'Community mini-board keyed by SPL mint; owner_wallet is the wallet that signed deploy (not necessarily on-chain mint creator).';
 
 create table if not exists public.liteboard_creation_codes (
   id uuid primary key default gen_random_uuid(),

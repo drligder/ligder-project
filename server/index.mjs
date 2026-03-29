@@ -947,12 +947,13 @@ function parseForumThreadReplyMessage(message) {
 const LITEBOARD_CHANNELS = new Set(['announcement', 'general']);
 const LITEBOARD_CODE_TTL_MS = 24 * 60 * 60 * 1000;
 /** If true: any wallet that passes the signed message + (for create) profile check can claim a Liteboard for any valid SPL mint. NEVER enable on a public multi-tenant API. */
-const LITEBOARD_BYPASS_CREATOR_VERIFY =
-  process.env.LITEBOARD_BYPASS_CREATOR_VERIFY === '1' ||
-  /^(true|yes)$/i.test(process.env.LITEBOARD_BYPASS_CREATOR_VERIFY?.trim() ?? '');
-if (LITEBOARD_BYPASS_CREATOR_VERIFY) {
+/** When set, require full creator proof (Metaplex, txs, etc.). Default: only valid SPL mint + signatures. */
+const LITEBOARD_STRICT_CREATOR_VERIFY =
+  process.env.LITEBOARD_STRICT_CREATOR_VERIFY === '1' ||
+  /^(true|yes)$/i.test(process.env.LITEBOARD_STRICT_CREATOR_VERIFY?.trim() ?? '');
+if (LITEBOARD_STRICT_CREATOR_VERIFY) {
   console.warn(
-    '[liteboard] LITEBOARD_BYPASS_CREATOR_VERIFY is on — creator checks are skipped. Unsafe for public multi-tenant APIs.'
+    '[liteboard] LITEBOARD_STRICT_CREATOR_VERIFY is on — creator checks enforced (launchpads may fail).'
   );
 }
 
@@ -1588,7 +1589,7 @@ async function solscanTokenMetaCreatorMatches(mintCanonical, walletCanon) {
   return false;
 }
 
-/** SPL mint exists (Token or Token-2022). Used when LITEBOARD_BYPASS_CREATOR_VERIFY is set. */
+/** SPL mint exists (Token or Token-2022). Default Liteboard gate when strict creator verify is off. */
 async function resolveLiteboardMintCanonicalOrError(mintInput) {
   let mintPk;
   try {
@@ -7029,9 +7030,9 @@ app.post('/api/liteboard/verify-mint', async (req, res) => {
       error: `You are banned until ${new Date(banV.banned_until).toLocaleString()}.`,
     });
   }
-  const authCheck = LITEBOARD_BYPASS_CREATOR_VERIFY
-    ? await resolveLiteboardMintCanonicalOrError(parsed.mint)
-    : await assertWalletIsMintCreator(walletOk, parsed.mint);
+  const authCheck = LITEBOARD_STRICT_CREATOR_VERIFY
+    ? await assertWalletIsMintCreator(walletOk, parsed.mint)
+    : await resolveLiteboardMintCanonicalOrError(parsed.mint);
   if (!authCheck.ok) {
     return res.status(403).json({ error: authCheck.error });
   }
@@ -7118,9 +7119,9 @@ app.post('/api/liteboard/create', async (req, res) => {
       error: 'Register a Ligder profile before creating a Liteboard.',
     });
   }
-  const authCheck2 = LITEBOARD_BYPASS_CREATOR_VERIFY
-    ? await resolveLiteboardMintCanonicalOrError(parsed.mint)
-    : await assertWalletIsMintCreator(walletOk, parsed.mint);
+  const authCheck2 = LITEBOARD_STRICT_CREATOR_VERIFY
+    ? await assertWalletIsMintCreator(walletOk, parsed.mint)
+    : await resolveLiteboardMintCanonicalOrError(parsed.mint);
   if (!authCheck2.ok) {
     return res.status(403).json({ error: authCheck2.error });
   }

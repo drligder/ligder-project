@@ -147,10 +147,9 @@ const LiteboardDeployPage = () => {
           Deploy a Liteboard
         </h1>
         <p className="text-sm text-gray-700 mb-6" style={{ fontFamily: 'Times New Roman, serif' }}>
-          Prove you <strong>created</strong> the mint: the server loads the mint&apos;s first on-chain
-          transaction and checks that your wallet was the <strong>fee payer or a signer</strong> (works with
-          pump-style relayers). Mint authority may be revoked. You&apos;ll receive a
-          one-time code, then sign again to create a public mini-forum at{' '}
+          Paste a valid <strong>SPL mint</strong> (classic or Token-2022). You sign a short message so we know
+          which wallet will own the board; the server only checks that the mint exists on-chain. You&apos;ll get
+          a one-time code, then sign again to create a public mini-forum at{' '}
           <code className="text-xs bg-gray-100 px-1">/liteboard/&lt;mint&gt;</code> with an{' '}
           <strong>Announcement</strong> channel (you only) and <strong>General</strong> (any registered Ligder
           user).
@@ -174,7 +173,7 @@ const LiteboardDeployPage = () => {
             disabled={busy || createBusy}
             onClick={() => void runVerify()}
           >
-            {busy ? 'Signing…' : 'Verify creator'}
+            {busy ? 'Signing…' : 'Verify mint'}
           </button>
 
           {authCode ? (
