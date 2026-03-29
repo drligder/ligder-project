@@ -52,8 +52,12 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const LITE_TOKEN_MINT = process.env.LITE_TOKEN_MINT?.trim() || '';
 const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL?.trim() || 'https://api.mainnet-beta.solana.com';
-/** Solscan Pro API (https://pro-api.solscan.io) — `token` header. Used for Liteboard creator = token owner/creator on Solscan. */
+/** Solscan Pro API — only used when LITEBOARD_USE_SOLSCAN_CREATOR=1 (off by default; API/UI often disagree). */
 const SOLSCAN_API_KEY = process.env.SOLSCAN_API_KEY?.trim() || '';
+const LITEBOARD_USE_SOLSCAN_CREATOR =
+  process.env.LITEBOARD_USE_SOLSCAN_CREATOR === '1' ||
+  /^(true|yes)$/i.test(process.env.LITEBOARD_USE_SOLSCAN_CREATOR?.trim() ?? '');
+const LITEBOARD_DEBUG_SOLSCAN = process.env.LITEBOARD_DEBUG_SOLSCAN === '1';
 const SOLANA_MEMO_RPC_URL = process.env.SOLANA_MEMO_RPC_URL?.trim() || SOLANA_RPC_URL;
 const SOLANA_MEMO_FEE_PAYER_SECRET_KEY_RAW =
   process.env.SOLANA_MEMO_FEE_PAYER_SECRET_KEY?.trim() || '';
@@ -1569,8 +1573,13 @@ async function solscanTokenMetaCreatorMatches(mintCanonical, walletCanon) {
       const t = setTimeout(() => ctrl.abort(), 15_000);
       const res = await fetch(url, { headers, signal: ctrl.signal });
       clearTimeout(t);
+      const body = await res.json().catch(() => null);
+      if (LITEBOARD_DEBUG_SOLSCAN) {
+        const snippet = body != null ? JSON.stringify(body).slice(0, 600) : '(non-json)';
+        console.log('[liteboard solscan]', res.status, url, snippet);
+      }
       if (!res.ok) continue;
-      const body = await res.json();
+      if (!body || typeof body !== 'object') continue;
       if (solscanBodyIndicatesWalletCreator(body, walletCanon)) return true;
     } catch {
       /* try next URL */
@@ -1643,7 +1652,13 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
     };
   }
 
-  if (SOLSCAN_API_KEY) {
+  const maEarly = mintInfo?.mintAuthority?.toBase58?.();
+  const faEarly = mintInfo?.freezeAuthority?.toBase58?.();
+  if (maEarly === walletCanon || faEarly === walletCanon) {
+    return { ok: true, mint: mintCanonical };
+  }
+
+  if (SOLSCAN_API_KEY && LITEBOARD_USE_SOLSCAN_CREATOR) {
     try {
       if (await solscanTokenMetaCreatorMatches(mintCanonical, walletCanon)) {
         return { ok: true, mint: mintCanonical };
@@ -1709,16 +1724,10 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
     }
   }
 
-  const ma = mintInfo?.mintAuthority?.toBase58?.();
-  const fa = mintInfo?.freezeAuthority?.toBase58?.();
-  if (ma === walletCanon || fa === walletCanon) {
-    return { ok: true, mint: mintCanonical };
-  }
-
   return {
     ok: false,
     error:
-      'Could not verify creator for this mint. With SOLSCAN_API_KEY we match Solscan token/meta (creator, owner, authorities, creators list). Otherwise: Metaplex / Token-2022, metadata JSON at URI, early mint txs, mint/freeze authority. Use the wallet Solscan shows for the token; confirm the API key and mainnet mint.',
+      'Could not verify creator for this mint. We use on-chain checks: Metaplex metadata, Token-2022 mint metadata extension, JSON at the on-chain metadata URI, early mint transactions (signers), and current mint/freeze authority. Optional: set LITEBOARD_USE_SOLSCAN_CREATOR=1 with SOLSCAN_API_KEY to also try Solscan Pro JSON (off by default). Use the wallet that signed the launch; RPC must be mainnet for that mint.',
   };
 }
 
