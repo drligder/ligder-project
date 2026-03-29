@@ -6649,6 +6649,75 @@ app.post('/api/admin/board-update', async (req, res) => {
   return res.json({ ok: true });
 });
 
+/**
+ * Create a Liteboard without creator proof (admin trust). Use when explorers show the user as
+ * creator/owner but automated checks fail (launchpads, API/UI mismatch).
+ * Body: { mint, owner_wallet } — owner must already have a profile.
+ */
+app.post('/api/admin/liteboard/grant', async (req, res) => {
+  if (!(await requireAdminAuth(req, res))) return;
+  const { mint: mintRaw, owner_wallet: ownerRaw } = req.body ?? {};
+  if (typeof mintRaw !== 'string' || typeof ownerRaw !== 'string') {
+    return res.status(400).json({ error: 'Invalid payload (mint, owner_wallet)' });
+  }
+  let ownerCanon;
+  try {
+    ownerCanon = new PublicKey(ownerRaw.trim()).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid owner_wallet' });
+  }
+  const mintRes = await resolveLiteboardMintCanonicalOrError(mintRaw);
+  if (!mintRes.ok) {
+    return res.status(400).json({ error: mintRes.error });
+  }
+  const mintCanon = mintRes.mint;
+  const { data: prof, error: pErr } = await supabase
+    .from('profiles')
+    .select('wallet')
+    .eq('wallet', ownerCanon)
+    .maybeSingle();
+  if (pErr) {
+    console.error(pErr);
+    return res.status(500).json({ error: pErr.message });
+  }
+  if (!prof) {
+    return res.status(400).json({
+      error: 'owner_wallet must be a registered profile (Ligder account).',
+    });
+  }
+  const { data: taken, error: tErr } = await supabase
+    .from('liteboards')
+    .select('id, owner_wallet')
+    .eq('mint', mintCanon)
+    .maybeSingle();
+  if (tErr) {
+    console.error(tErr);
+    return res.status(500).json({ error: tErr.message });
+  }
+  if (taken?.id) {
+    return res.status(409).json({
+      error: 'Liteboard already exists for this mint.',
+      liteboard_id: taken.id,
+    });
+  }
+  const { data: lb, error: lbErr } = await supabase
+    .from('liteboards')
+    .insert({ mint: mintCanon, owner_wallet: ownerCanon })
+    .select('id, mint, owner_wallet, created_at')
+    .single();
+  if (lbErr) {
+    const m = String(lbErr.message ?? '');
+    if (/does not exist|relation/i.test(m)) {
+      return res.status(500).json({
+        error: 'Run SQL migration 021_liteboards.sql on the database',
+      });
+    }
+    console.error(lbErr);
+    return res.status(500).json({ error: lbErr.message });
+  }
+  return res.status(201).json({ ok: true, liteboard: lb });
+});
+
 app.post('/api/admin/users/search', async (req, res) => {
   if (!(await requireAdminAuth(req, res))) return;
   const { query: queryRaw } = req.body ?? {};

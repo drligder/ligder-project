@@ -68,3 +68,5 @@ alter table public.liteboards enable row level security;
 alter table public.liteboard_creation_codes enable row level security;
 alter table public.liteboard_threads enable row level security;
 alter table public.liteboard_thread_posts enable row level security;
+
+-- Optional: admins can create a row via POST /api/admin/liteboard/grant (Bearer admin session) when automated creator checks fail.
