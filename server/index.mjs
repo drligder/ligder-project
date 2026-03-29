@@ -936,10 +936,12 @@ function parseForumThreadReplyMessage(message) {
 const LITEBOARD_CHANNELS = new Set(['announcement', 'general']);
 const LITEBOARD_CODE_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** Oldest signature involving `address` (paginate; mint accounts usually have few txs). */
-async function getOldestSignatureForAddress(connection, pubkey) {
+/**
+ * Oldest-first signatures for this address (paginate to true oldest, then take up to `max` from that end).
+ */
+async function getOldestTransactionSignatures(connection, pubkey, max = 20) {
   let before = undefined;
-  let oldestSig = null;
+  let lastPage = null;
   const maxPages = 200;
   for (let page = 0; page < maxPages; page++) {
     const sigs = await connection.getSignaturesForAddress(pubkey, {
@@ -947,11 +949,47 @@ async function getOldestSignatureForAddress(connection, pubkey) {
       before,
     });
     if (!sigs.length) break;
-    oldestSig = sigs[sigs.length - 1].signature;
+    lastPage = sigs;
     if (sigs.length < 1000) break;
-    before = oldestSig;
+    before = sigs[sigs.length - 1].signature;
   }
-  return oldestSig;
+  if (!lastPage?.length) return [];
+  const n = Math.min(max, lastPage.length);
+  return lastPage.slice(-n).map((x) => x.signature).reverse();
+}
+
+function inferNumRequiredSignatures(parsed, rawTx) {
+  const fromHeader =
+    rawTx?.transaction?.message?.header?.numRequiredSignatures ??
+    parsed?.transaction?.message?.header?.numRequiredSignatures;
+  if (typeof fromHeader === 'number' && fromHeader > 0) return fromHeader;
+  const sigs = parsed?.transaction?.signatures;
+  if (Array.isArray(sigs) && sigs.length > 0) {
+    const n = sigs.filter((s) => typeof s === 'string' && s.length > 0).length;
+    if (n > 0) return n;
+  }
+  return 0;
+}
+
+/** SPL jsonParsed: mint creation (top-level or CPI). */
+function parsedTxInitializesThisMint(parsed, mintCanonical) {
+  const checkIx = (ix) => {
+    if (!ix || typeof ix !== 'object') return false;
+    const p = ix.parsed;
+    if (!p || typeof p !== 'object') return false;
+    const t = p.type;
+    if (typeof t !== 'string' || !/^initializeMint/i.test(t)) return false;
+    const m = p.info?.mint;
+    return typeof m === 'string' && m === mintCanonical;
+  };
+  const walk = (list) =>
+    Array.isArray(list) && list.some((ix) => checkIx(ix));
+  const msg = parsed?.transaction?.message;
+  if (walk(msg?.instructions)) return true;
+  for (const group of parsed?.meta?.innerInstructions ?? []) {
+    if (walk(group?.instructions)) return true;
+  }
+  return false;
 }
 
 function parsedTransactionFeePayerBase58(tx) {
@@ -1070,12 +1108,9 @@ function mergeRequiredSignersFromDecodedMessage(message, meta, set) {
  * from the raw decoded tx when present.
  */
 function mergePositionalRequiredSignersFromParsed(parsed, rawTx, set) {
-  const nReq =
-    rawTx?.transaction?.message?.header?.numRequiredSignatures ??
-    parsed?.transaction?.message?.header?.numRequiredSignatures ??
-    0;
+  const nReq = inferNumRequiredSignatures(parsed, rawTx);
   const keys = parsed?.transaction?.message?.accountKeys;
-  if (typeof nReq !== 'number' || nReq <= 0 || !Array.isArray(keys)) return;
+  if (nReq <= 0 || !Array.isArray(keys)) return;
   const cap = Math.min(nReq, keys.length);
   for (let i = 0; i < cap; i++) {
     const pk = keys[i]?.pubkey;
@@ -1130,11 +1165,50 @@ function parsedTransactionRequiredSignerPubkeysSet(tx) {
   return set;
 }
 
+async function loadLiteboardMintTxSigners(connection, sig, txOpts) {
+  let parsed;
+  let rawTx;
+  try {
+    [parsed, rawTx] = await Promise.all([
+      connection.getParsedTransaction(sig, txOpts),
+      connection.getTransaction(sig, txOpts),
+    ]);
+  } catch (e) {
+    console.error(e);
+    return null;
+  }
+  if (!rawTx?.transaction?.message) {
+    try {
+      rawTx = await connection.getTransaction(sig, txOpts);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!parsed?.transaction) return null;
+  const signers = parsedTransactionRequiredSignerPubkeysSet(parsed);
+  if (rawTx?.transaction?.message) {
+    mergeRequiredSignersFromDecodedMessage(
+      rawTx.transaction.message,
+      rawTx.meta,
+      signers
+    );
+  }
+  mergePositionalRequiredSignersFromParsed(parsed, rawTx, signers);
+  return { signers, parsed, rawTx };
+}
+
 /**
- * Liteboard deploy: wallet must be **fee payer or a required signer** on the mint’s earliest tx
- * (covers relayer/launchpad flows where the user signs but does not pay fees).
+ * Liteboard deploy: wallet must sign a **creation-relevant** mint tx (global oldest, or SPL
+ * initializeMint* for this mint among the oldest txs), or still hold mint/freeze authority.
  */
 async function assertWalletIsMintCreator(walletBase58, mintInput) {
+  let walletCanon;
+  try {
+    walletCanon = new PublicKey(walletBase58.trim()).toBase58();
+  } catch {
+    return { ok: false, error: 'Invalid wallet' };
+  }
+
   let mintPk;
   try {
     mintPk = new PublicKey(mintInput.trim());
@@ -1163,14 +1237,18 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
     };
   }
 
-  let oldestSig;
+  let candidateSigs;
   try {
-    oldestSig = await getOldestSignatureForAddress(dividendsConnection, mintPk);
+    candidateSigs = await getOldestTransactionSignatures(
+      dividendsConnection,
+      mintPk,
+      20
+    );
   } catch (e) {
     console.error(e);
     return { ok: false, error: 'Could not load signature history for this mint.' };
   }
-  if (!oldestSig) {
+  if (!candidateSigs.length) {
     return { ok: false, error: 'No on-chain history found for this mint address.' };
   }
 
@@ -1178,57 +1256,34 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
     maxSupportedTransactionVersion: 0,
     commitment: 'confirmed',
   };
-  let parsed;
-  let rawTx;
-  try {
-    [parsed, rawTx] = await Promise.all([
-      dividendsConnection.getParsedTransaction(oldestSig, txOpts),
-      dividendsConnection.getTransaction(oldestSig, txOpts),
-    ]);
-  } catch (e) {
-    console.error(e);
-    return {
-      ok: false,
-      error: 'Could not load the mint’s earliest transaction from RPC.',
-    };
-  }
-  if (!parsed?.transaction) {
-    return {
-      ok: false,
-      error:
-        'Earliest mint transaction is not available (RPC retention). Try a full-history RPC.',
-    };
-  }
 
-  const signers = parsedTransactionRequiredSignerPubkeysSet(parsed);
-  if (rawTx?.transaction?.message) {
-    mergeRequiredSignersFromDecodedMessage(
-      rawTx.transaction.message,
-      rawTx.meta,
-      signers
-    );
-  }
-  mergePositionalRequiredSignersFromParsed(parsed, rawTx, signers);
-  if (signers.size === 0) {
-    return {
-      ok: false,
-      error: 'Could not read signers for the mint’s earliest transaction.',
-    };
-  }
-  if (!signers.has(walletBase58)) {
-    const ma = mintInfo?.mintAuthority?.toBase58?.();
-    const fa = mintInfo?.freezeAuthority?.toBase58?.();
-    if (ma === walletBase58 || fa === walletBase58) {
+  for (let i = 0; i < candidateSigs.length; i++) {
+    const sig = candidateSigs[i];
+    let loaded;
+    try {
+      loaded = await loadLiteboardMintTxSigners(dividendsConnection, sig, txOpts);
+    } catch (e) {
+      console.error(e);
+      continue;
+    }
+    if (!loaded || loaded.signers.size === 0) continue;
+    if (!loaded.signers.has(walletCanon)) continue;
+    if (i === 0 || parsedTxInitializesThisMint(loaded.parsed, mintCanonical)) {
       return { ok: true, mint: mintCanonical };
     }
-    return {
-      ok: false,
-      error:
-        'Connected wallet did not sign the mint’s earliest on-chain transaction (must be fee payer or a required signer—e.g. launchpad relayers pay fees while you still sign). If mint/freeze authority was revoked, the wallet that still signs on-chain must match; Solscan “creator” can differ from tx signers.',
-    };
   }
 
-  return { ok: true, mint: mintCanonical };
+  const ma = mintInfo?.mintAuthority?.toBase58?.();
+  const fa = mintInfo?.freezeAuthority?.toBase58?.();
+  if (ma === walletCanon || fa === walletCanon) {
+    return { ok: true, mint: mintCanonical };
+  }
+
+  return {
+    ok: false,
+    error:
+      'Could not verify you created this mint: your wallet did not sign the oldest mint transactions we checked, or an SPL initializeMint for this mint, and you are not the current mint/freeze authority. Connect the wallet that signed the launch transaction (launchpads often use a relayer fee payer).',
+  };
 }
 
 function messageLooksLikeLiteboardMintVerify(message, wallet) {
