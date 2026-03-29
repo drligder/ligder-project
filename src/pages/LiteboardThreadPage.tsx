@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useWallet } from '../contexts/WalletContext';
 import { useLigderProfile } from '../hooks/useLigderProfile';
 import { apiUrl } from '../lib/apiBase';
+import { liteboardTokenLabel } from '../lib/liteboardTokenLabel';
 import { parseApiJson } from '../lib/parseApiJson';
 import { uint8ToBase64 } from '../lib/uint8Base64';
 
@@ -38,6 +39,8 @@ const LiteboardThreadPage = () => {
 
   const [title, setTitle] = useState('');
   const [ownerWallet, setOwnerWallet] = useState<string | null>(null);
+  const [tokenName, setTokenName] = useState<string | null>(null);
+  const [tokenSymbol, setTokenSymbol] = useState<string | null>(null);
   const [posts, setPosts] = useState<PostRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +66,11 @@ const LiteboardThreadPage = () => {
       const j = await parseApiJson<{
         thread?: { title: string };
         posts?: PostRow[];
-        liteboard?: { owner_wallet: string };
+        liteboard?: {
+          owner_wallet: string;
+          token_name?: string | null;
+          token_symbol?: string | null;
+        };
         error?: string;
       }>(r);
       if (!r.ok) {
@@ -72,8 +79,12 @@ const LiteboardThreadPage = () => {
       setTitle(j.thread?.title ?? '');
       setPosts(j.posts ?? []);
       setOwnerWallet(j.liteboard?.owner_wallet ?? null);
+      setTokenName(j.liteboard?.token_name ?? null);
+      setTokenSymbol(j.liteboard?.token_symbol ?? null);
     } catch (e) {
       setPosts([]);
+      setTokenName(null);
+      setTokenSymbol(null);
       setErr(e instanceof Error ? e.message : 'Failed to load');
     } finally {
       setLoading(false);
@@ -89,6 +100,7 @@ const LiteboardThreadPage = () => {
     (channel === 'general' || (ownerWallet != null && publicKey === ownerWallet));
 
   const encMint = encodeURIComponent(mint);
+  const tokenLabel = liteboardTokenLabel(tokenName, tokenSymbol);
 
   const submitReply = async () => {
     if (!publicKey || !canReply) return;
@@ -170,6 +182,11 @@ const LiteboardThreadPage = () => {
           <p className="text-sm text-red-800">{err}</p>
         ) : (
           <>
+            {tokenLabel ? (
+              <p className="text-sm text-gray-700 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                {tokenLabel}
+              </p>
+            ) : null}
             <h1 className="text-xl font-bold mb-6" style={{ fontFamily: 'Arial, sans-serif' }}>
               {title}
             </h1>

@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useWallet } from '../contexts/WalletContext';
 import { useLigderProfile } from '../hooks/useLigderProfile';
 import { apiUrl } from '../lib/apiBase';
+import { liteboardTokenLabel } from '../lib/liteboardTokenLabel';
 import { parseApiJson } from '../lib/parseApiJson';
 import { uint8ToBase64 } from '../lib/uint8Base64';
 
@@ -33,6 +34,8 @@ const LiteboardChannelPage = () => {
   const showRegister = publicKey ? !profileLoading && !isRegistered : true;
 
   const [ownerWallet, setOwnerWallet] = useState<string | null>(null);
+  const [tokenName, setTokenName] = useState<string | null>(null);
+  const [tokenSymbol, setTokenSymbol] = useState<string | null>(null);
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,12 +68,26 @@ const LiteboardChannelPage = () => {
       }
       setThreads(j.threads ?? []);
       const r2 = await fetch(apiUrl(`/api/liteboards/${encodeURIComponent(mint)}`));
-      const j2 = await parseApiJson<{ liteboard?: { owner_wallet: string } }>(r2);
+      const j2 = await parseApiJson<{
+        liteboard?: {
+          owner_wallet: string;
+          token_name?: string | null;
+          token_symbol?: string | null;
+        };
+      }>(r2);
       if (r2.ok && j2.liteboard) {
         setOwnerWallet(j2.liteboard.owner_wallet);
+        setTokenName(j2.liteboard.token_name ?? null);
+        setTokenSymbol(j2.liteboard.token_symbol ?? null);
+      } else {
+        setTokenName(null);
+        setTokenSymbol(null);
       }
     } catch (e) {
       setThreads([]);
+      setOwnerWallet(null);
+      setTokenName(null);
+      setTokenSymbol(null);
       setErr(e instanceof Error ? e.message : 'Failed to load');
     } finally {
       setLoading(false);
@@ -86,6 +103,7 @@ const LiteboardChannelPage = () => {
     (channel === 'general' || (ownerWallet != null && publicKey === ownerWallet));
 
   const encMint = encodeURIComponent(mint);
+  const tokenLabel = liteboardTokenLabel(tokenName, tokenSymbol);
 
   const createThread = async () => {
     if (!publicKey || !canPost) return;
@@ -174,6 +192,11 @@ const LiteboardChannelPage = () => {
         <h1 className="text-xl font-bold capitalize mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
           {channel}
         </h1>
+        {tokenLabel ? (
+          <p className="text-sm text-gray-800 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+            {tokenLabel}
+          </p>
+        ) : null}
         <p className="text-xs font-mono text-gray-600 break-all mb-4">{mint}</p>
 
         {loading ? (

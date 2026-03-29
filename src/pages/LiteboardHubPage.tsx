@@ -4,6 +4,7 @@ import { LoginDropdown } from '../components/LoginDropdown';
 import { useLigderProfile } from '../hooks/useLigderProfile';
 import { useWallet } from '../contexts/WalletContext';
 import { apiUrl } from '../lib/apiBase';
+import { liteboardTokenLabel } from '../lib/liteboardTokenLabel';
 import { parseApiJson } from '../lib/parseApiJson';
 
 const LiteboardHubPage = () => {
@@ -18,6 +19,8 @@ const LiteboardHubPage = () => {
     mint: string;
     owner_wallet: string;
     created_at: string;
+    token_name?: string | null;
+    token_symbol?: string | null;
   } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +56,7 @@ const LiteboardHubPage = () => {
   }, [load]);
 
   const encMint = encodeURIComponent(mint);
+  const tokenLabel = lb != null ? liteboardTokenLabel(lb.token_name, lb.token_symbol) : null;
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -86,8 +90,13 @@ const LiteboardHubPage = () => {
         ) : lb ? (
           <>
             <h1 className="text-xl font-bold mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
-              Liteboard
+              {tokenLabel ?? 'Liteboard'}
             </h1>
+            {tokenLabel ? (
+              <p className="text-xs text-gray-600 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+                Liteboard
+              </p>
+            ) : null}
             <p className="text-xs font-mono text-gray-700 break-all mb-6">{lb.mint}</p>
             <div className="grid gap-4 sm:grid-cols-2">
               <Link

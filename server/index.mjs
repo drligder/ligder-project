@@ -1613,6 +1613,107 @@ async function resolveLiteboardMintCanonicalOrError(mintInput) {
   };
 }
 
+/** Strip fixed-width / null-padded SPL & Metaplex metadata strings. */
+function trimSplMetaDisplayString(raw) {
+  if (raw == null) return null;
+  const s = typeof raw === 'string' ? raw : String(raw);
+  const t = s.replace(/\0/g, '').trim();
+  return t.length > 0 ? t : null;
+}
+
+/**
+ * Human-readable token name + ticker for UI (hub, etc.).
+ * Order: Metaplex metadata PDA → Token-2022 on-mint extension → Jupiter token list CDN / lite-api.
+ */
+async function fetchSplMintDisplayMetadata(mintCanon) {
+  const empty = { token_name: null, token_symbol: null };
+  let mintPk;
+  try {
+    mintPk = new PublicKey(mintCanon);
+  } catch {
+    return empty;
+  }
+
+  let programId = null;
+  for (const pid of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+    try {
+      await getMint(dividendsConnection, mintPk, 'confirmed', pid);
+      programId = pid;
+      break;
+    } catch {
+      /* try next */
+    }
+  }
+  if (!programId) return empty;
+
+  let token_name = null;
+  let token_symbol = null;
+
+  try {
+    const umi = createUmi(dividendsConnection).use(mplTokenMetadata());
+    const meta = await safeFetchMetadataFromSeeds(umi, { mint: fromWeb3JsPublicKey(mintPk) });
+    if (meta) {
+      token_name = trimSplMetaDisplayString(meta.name);
+      token_symbol = trimSplMetaDisplayString(meta.symbol);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  if (programId.equals(TOKEN_2022_PROGRAM_ID)) {
+    try {
+      const tm = await getTokenMetadata(
+        dividendsConnection,
+        mintPk,
+        'confirmed',
+        TOKEN_2022_PROGRAM_ID
+      );
+      if (tm) {
+        if (!token_name) token_name = trimSplMetaDisplayString(tm.name);
+        if (!token_symbol) token_symbol = trimSplMetaDisplayString(tm.symbol);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const needJup = !token_name || !token_symbol;
+  if (needJup) {
+    const urls = [
+      `https://tokens.jup.ag/token/${encodeURIComponent(mintCanon)}`,
+      `https://lite-api.jup.ag/tokens/v1/token/${encodeURIComponent(mintCanon)}`,
+    ];
+    for (const url of urls) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 10_000);
+      try {
+        const res = await fetch(url, {
+          signal: ctrl.signal,
+          redirect: 'follow',
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'LigderLiteboard/1',
+          },
+        });
+        if (!res.ok) continue;
+        const body = await res.json().catch(() => null);
+        if (!body || typeof body !== 'object') continue;
+        const jn = trimSplMetaDisplayString(body.name);
+        const js = trimSplMetaDisplayString(body.symbol);
+        if (!token_name && jn) token_name = jn;
+        if (!token_symbol && js) token_symbol = js;
+        if (token_name && token_symbol) break;
+      } catch {
+        /* next URL */
+      } finally {
+        clearTimeout(t);
+      }
+    }
+  }
+
+  return { token_name, token_symbol };
+}
+
 /**
  * Liteboard deploy: Metaplex metadata (creator / update authority), creation-relevant mint txs,
  * or current mint/freeze authority.
@@ -7227,7 +7328,13 @@ app.get('/api/liteboards/:mint', async (req, res) => {
   if (!data) {
     return res.status(404).json({ error: 'Liteboard not found' });
   }
-  return res.json({ liteboard: data });
+  let tokenMeta = { token_name: null, token_symbol: null };
+  try {
+    tokenMeta = await fetchSplMintDisplayMetadata(mintOk);
+  } catch (e) {
+    console.error('liteboard token metadata', e);
+  }
+  return res.json({ liteboard: { ...data, ...tokenMeta } });
 });
 
 app.get('/api/liteboards/:mint/threads', async (req, res) => {
@@ -7359,8 +7466,14 @@ app.get('/api/liteboards/:mint/threads/:threadNum', async (req, res) => {
       author_is_moderator: pr?.is_moderator === true && pr?.is_admin !== true,
     };
   });
+  let tokenMeta = { token_name: null, token_symbol: null };
+  try {
+    tokenMeta = await fetchSplMintDisplayMetadata(mintOk);
+  } catch (e) {
+    console.error('liteboard token metadata (thread)', e);
+  }
   return res.json({
-    liteboard: lb,
+    liteboard: { ...lb, ...tokenMeta },
     thread,
     posts: postsOut,
   });
