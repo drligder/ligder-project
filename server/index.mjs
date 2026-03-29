@@ -940,6 +940,15 @@ function parseForumThreadReplyMessage(message) {
 
 const LITEBOARD_CHANNELS = new Set(['announcement', 'general']);
 const LITEBOARD_CODE_TTL_MS = 24 * 60 * 60 * 1000;
+/** If true: any wallet that passes the signed message + (for create) profile check can claim a Liteboard for any valid SPL mint. NEVER enable on a public multi-tenant API. */
+const LITEBOARD_BYPASS_CREATOR_VERIFY =
+  process.env.LITEBOARD_BYPASS_CREATOR_VERIFY === '1' ||
+  /^(true|yes)$/i.test(process.env.LITEBOARD_BYPASS_CREATOR_VERIFY?.trim() ?? '');
+if (LITEBOARD_BYPASS_CREATOR_VERIFY) {
+  console.warn(
+    '[liteboard] LITEBOARD_BYPASS_CREATOR_VERIFY is on — creator checks are skipped. Unsafe for public multi-tenant APIs.'
+  );
+}
 
 /**
  * Oldest-first signatures for this address (paginate to true oldest, then take up to `max` from that end).
@@ -1406,6 +1415,30 @@ async function walletMatchesOffchainMetadataAtUri(connection, mintPk, walletCano
     if (offchainJsonListsWalletAsCreator(j, walletCanon)) return true;
   }
   return false;
+}
+
+/** SPL mint exists (Token or Token-2022). Used when LITEBOARD_BYPASS_CREATOR_VERIFY is set. */
+async function resolveLiteboardMintCanonicalOrError(mintInput) {
+  let mintPk;
+  try {
+    mintPk = new PublicKey(mintInput.trim());
+  } catch {
+    return { ok: false, error: 'Invalid mint address' };
+  }
+  const mintCanonical = mintPk.toBase58();
+  for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+    try {
+      await getMint(dividendsConnection, mintPk, 'confirmed', programId);
+      return { ok: true, mint: mintCanonical };
+    } catch {
+      /* try next program */
+    }
+  }
+  return {
+    ok: false,
+    error:
+      'Could not read this mint on-chain (check RPC network or SPL token program).',
+  };
 }
 
 /**
@@ -6746,7 +6779,9 @@ app.post('/api/liteboard/verify-mint', async (req, res) => {
       error: `You are banned until ${new Date(banV.banned_until).toLocaleString()}.`,
     });
   }
-  const authCheck = await assertWalletIsMintCreator(walletOk, parsed.mint);
+  const authCheck = LITEBOARD_BYPASS_CREATOR_VERIFY
+    ? await resolveLiteboardMintCanonicalOrError(parsed.mint)
+    : await assertWalletIsMintCreator(walletOk, parsed.mint);
   if (!authCheck.ok) {
     return res.status(403).json({ error: authCheck.error });
   }
@@ -6833,7 +6868,9 @@ app.post('/api/liteboard/create', async (req, res) => {
       error: 'Register a Ligder profile before creating a Liteboard.',
     });
   }
-  const authCheck2 = await assertWalletIsMintCreator(walletOk, parsed.mint);
+  const authCheck2 = LITEBOARD_BYPASS_CREATOR_VERIFY
+    ? await resolveLiteboardMintCanonicalOrError(parsed.mint)
+    : await assertWalletIsMintCreator(walletOk, parsed.mint);
   if (!authCheck2.ok) {
     return res.status(403).json({ error: authCheck2.error });
   }
