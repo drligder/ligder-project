@@ -52,6 +52,8 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const LITE_TOKEN_MINT = process.env.LITE_TOKEN_MINT?.trim() || '';
 const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL?.trim() || 'https://api.mainnet-beta.solana.com';
+/** Solscan Pro API (https://pro-api.solscan.io) — `token` header. Used for Liteboard creator = token owner/creator on Solscan. */
+const SOLSCAN_API_KEY = process.env.SOLSCAN_API_KEY?.trim() || '';
 const SOLANA_MEMO_RPC_URL = process.env.SOLANA_MEMO_RPC_URL?.trim() || SOLANA_RPC_URL;
 const SOLANA_MEMO_FEE_PAYER_SECRET_KEY_RAW =
   process.env.SOLANA_MEMO_FEE_PAYER_SECRET_KEY?.trim() || '';
@@ -1417,6 +1419,99 @@ async function walletMatchesOffchainMetadataAtUri(connection, mintPk, walletCano
   return false;
 }
 
+function solscanTokenMetaDataRoot(body) {
+  if (!body || typeof body !== 'object') return null;
+  if (
+    body.data != null &&
+    typeof body.data === 'object' &&
+    !Array.isArray(body.data)
+  ) {
+    return body.data;
+  }
+  if (body.result != null && typeof body.result === 'object') {
+    return body.result;
+  }
+  return body;
+}
+
+function solscanPayloadListsWalletAsCreator(data, walletCanon, depth = 0) {
+  if (!data || typeof data !== 'object' || depth > 8) return false;
+  const strFields = [
+    'creator',
+    'owner',
+    'tokenCreator',
+    'mintAuthority',
+    'freezeAuthority',
+    'authority',
+    'updateAuthority',
+    'deployer',
+    'tokenOwner',
+  ];
+  for (const f of strFields) {
+    const v = data[f];
+    if (typeof v === 'string' && v === walletCanon) return true;
+    if (
+      v &&
+      typeof v === 'object' &&
+      typeof v.address === 'string' &&
+      v.address === walletCanon
+    ) {
+      return true;
+    }
+  }
+  const lists =
+    data.creators ??
+    data.creatorList ??
+    data.tokenCreators ??
+    data.creator_accounts;
+  if (Array.isArray(lists)) {
+    for (const c of lists) {
+      const a =
+        typeof c === 'string'
+          ? c
+          : c?.address ?? c?.wallet ?? c?.pubkey ?? c?.account;
+      if (typeof a === 'string' && a === walletCanon) return true;
+    }
+  }
+  if (data.metadata && typeof data.metadata === 'object') {
+    if (solscanPayloadListsWalletAsCreator(data.metadata, walletCanon, depth + 1))
+      return true;
+  }
+  if (data.token && typeof data.token === 'object') {
+    if (solscanPayloadListsWalletAsCreator(data.token, walletCanon, depth + 1))
+      return true;
+  }
+  return false;
+}
+
+async function solscanTokenMetaCreatorMatches(mintCanonical, walletCanon) {
+  if (!SOLSCAN_API_KEY) return false;
+  const urls = [
+    `https://pro-api.solscan.io/v2.0/token/meta?tokenAddress=${encodeURIComponent(mintCanonical)}`,
+    `https://pro-api.solscan.io/v1.0/token/meta?tokenAddress=${encodeURIComponent(mintCanonical)}`,
+  ];
+  const headers = {
+    accept: 'application/json',
+    token: SOLSCAN_API_KEY,
+  };
+  for (const url of urls) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15_000);
+      const res = await fetch(url, { headers, signal: ctrl.signal });
+      clearTimeout(t);
+      if (!res.ok) continue;
+      const body = await res.json();
+      const root = solscanTokenMetaDataRoot(body);
+      if (root && solscanPayloadListsWalletAsCreator(root, walletCanon, 0))
+        return true;
+    } catch {
+      /* try next URL */
+    }
+  }
+  return false;
+}
+
 /** SPL mint exists (Token or Token-2022). Used when LITEBOARD_BYPASS_CREATOR_VERIFY is set. */
 async function resolveLiteboardMintCanonicalOrError(mintInput) {
   let mintPk;
@@ -1479,6 +1574,16 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
       error:
         'Could not read this mint on-chain (check RPC network or SPL token program).',
     };
+  }
+
+  if (SOLSCAN_API_KEY) {
+    try {
+      if (await solscanTokenMetaCreatorMatches(mintCanonical, walletCanon)) {
+        return { ok: true, mint: mintCanonical };
+      }
+    } catch (e) {
+      console.error('liteboard solscan creator check', e);
+    }
   }
 
   if (
@@ -1546,7 +1651,7 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
   return {
     ok: false,
     error:
-      'Could not verify creator for this mint. We check: Metaplex / Token-2022 on-chain fields, JSON at the on-chain metadata URI (common for LetsBonk / launchpads), early mint txs, and mint/freeze authority. Use the same wallet shown as creator in that metadata JSON; IPFS gateways can be slow—retry or try again later.',
+      'Could not verify creator for this mint. With SOLSCAN_API_KEY we match Solscan token/meta (creator, owner, authorities, creators list). Otherwise: Metaplex / Token-2022, metadata JSON at URI, early mint txs, mint/freeze authority. Use the wallet Solscan shows for the token; confirm the API key and mainnet mint.',
   };
 }
 
