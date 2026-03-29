@@ -1246,6 +1246,168 @@ async function walletMatchesMetadataOrToken2022Extension(connection, mintPk, wal
   return mplex || t22;
 }
 
+function normalizeTokenMetadataUri(raw) {
+  const u = String(raw ?? '').trim();
+  if (!u) return null;
+  if (/^ipfs:\/\//i.test(u)) {
+    const p = u.replace(/^ipfs:\/\//i, '').replace(/^ipfs\//i, '');
+    return `https://ipfs.io/ipfs/${p}`;
+  }
+  if (/^ar:\/\//i.test(u)) {
+    return `https://arweave.net/${u.replace(/^ar:\/\//i, '')}`;
+  }
+  if (/^https?:\/\//i.test(u)) return u;
+  return null;
+}
+
+function metadataFetchUrlIsReasonable(urlStr) {
+  try {
+    const u = new URL(urlStr);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    const h = u.hostname.toLowerCase();
+    if (h === 'localhost' || h === '0.0.0.0' || u.hostname === '[::1]') return false;
+    if (/^(10\.|192\.168\.|127\.)/.test(u.hostname)) return false;
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(u.hostname)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function metadataJsonFetchUrls(uriRaw) {
+  const raw = String(uriRaw ?? '').trim();
+  /** @type {string[]} */
+  const out = [];
+  const push = (u) => {
+    if (u && metadataFetchUrlIsReasonable(u) && !out.includes(u)) out.push(u);
+  };
+  if (/^ipfs:\/\//i.test(raw)) {
+    const p = raw.replace(/^ipfs:\/\//i, '').replace(/^ipfs\//i, '');
+    push(`https://ipfs.io/ipfs/${p}`);
+    push(`https://cloudflare-ipfs.com/ipfs/${p}`);
+    push(`https://nftstorage.link/ipfs/${p}`);
+  } else {
+    const one = normalizeTokenMetadataUri(raw);
+    if (one) push(one);
+  }
+  return out;
+}
+
+async function fetchUrlTextLimited(url) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12_000);
+  try {
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      redirect: 'follow',
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'User-Agent': 'LigderLiteboard/1',
+      },
+    });
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength > 512 * 1024) return null;
+    return new TextDecoder('utf8', { fatal: false }).decode(buf);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function fetchTokenMetadataJsonText(uriRaw) {
+  for (const url of metadataJsonFetchUrls(uriRaw)) {
+    const text = await fetchUrlTextLimited(url);
+    if (text) return text;
+  }
+  return null;
+}
+
+function offchainJsonListsWalletAsCreator(obj, walletCanon) {
+  if (!obj || typeof obj !== 'object') return false;
+  const keys = [
+    'creator',
+    'createdBy',
+    'created_by',
+    'creatorAddress',
+    'mintAuthority',
+    'mint_authority',
+  ];
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim() === walletCanon) return true;
+  }
+  const list =
+    obj.properties?.creators ??
+    obj.creators ??
+    obj.properties?.files?.[0]?.creators;
+  if (Array.isArray(list)) {
+    for (const c of list) {
+      const addr = typeof c === 'string' ? c : c?.address;
+      if (typeof addr === 'string' && addr === walletCanon) return true;
+    }
+  }
+  if (Array.isArray(obj.attributes)) {
+    for (const a of obj.attributes) {
+      if (!a || typeof a !== 'object') continue;
+      const tt = String(a.trait_type ?? a.traitType ?? '').toLowerCase();
+      if (
+        (tt.includes('creator') || tt === 'mint authority' || tt === 'author') &&
+        String(a.value ?? '') === walletCanon
+      ) {
+        return true;
+      }
+    }
+  }
+  if (obj.extensions && typeof obj.extensions === 'object') {
+    return offchainJsonListsWalletAsCreator(obj.extensions, walletCanon);
+  }
+  return false;
+}
+
+/**
+ * Launchpads (e.g. LetsBonk / Raydium Launchlab) often leave Metaplex update authority as the
+ * platform but put the user wallet in JSON at the on-chain metadata URI.
+ */
+async function walletMatchesOffchainMetadataAtUri(connection, mintPk, walletCanon) {
+  const uris = new Set();
+  try {
+    const umi = createUmi(connection).use(mplTokenMetadata());
+    const meta = await safeFetchMetadataFromSeeds(umi, {
+      mint: fromWeb3JsPublicKey(mintPk),
+    });
+    const u = meta?.uri ? String(meta.uri).trim() : '';
+    if (u) uris.add(u);
+  } catch {
+    /* ignore */
+  }
+  try {
+    const tm = await getTokenMetadata(
+      connection,
+      mintPk,
+      'confirmed',
+      TOKEN_2022_PROGRAM_ID
+    );
+    const u = tm?.uri ? String(tm.uri).trim() : '';
+    if (u) uris.add(u);
+  } catch {
+    /* ignore */
+  }
+  for (const raw of uris) {
+    const text = await fetchTokenMetadataJsonText(raw);
+    if (!text) continue;
+    let j;
+    try {
+      j = JSON.parse(text);
+    } catch {
+      continue;
+    }
+    if (offchainJsonListsWalletAsCreator(j, walletCanon)) return true;
+  }
+  return false;
+}
+
 /**
  * Liteboard deploy: Metaplex metadata (creator / update authority), creation-relevant mint txs,
  * or current mint/freeze authority.
@@ -1288,6 +1450,16 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
 
   if (
     await walletMatchesMetadataOrToken2022Extension(
+      dividendsConnection,
+      mintPk,
+      walletCanon
+    )
+  ) {
+    return { ok: true, mint: mintCanonical };
+  }
+
+  if (
+    await walletMatchesOffchainMetadataAtUri(
       dividendsConnection,
       mintPk,
       walletCanon
@@ -1341,7 +1513,7 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
   return {
     ok: false,
     error:
-      'Could not verify creator on-chain for this mint. We match: Metaplex metadata (update authority or creators list), Token-2022 mint metadata extension update authority, early mint transactions, or current mint/freeze authority. If Solscan only shows a creator from off-chain JSON (not stored in metadata), that cannot be proven here.',
+      'Could not verify creator for this mint. We check: Metaplex / Token-2022 on-chain fields, JSON at the on-chain metadata URI (common for LetsBonk / launchpads), early mint txs, and mint/freeze authority. Use the same wallet shown as creator in that metadata JSON; IPFS gateways can be slow—retry or try again later.',
   };
 }
 
