@@ -16,12 +16,13 @@ import {
   createTransferCheckedInstruction,
   getAssociatedTokenAddressSync,
   getMint,
+  getTokenMetadata,
   TOKEN_PROGRAM_ID,
   TOKEN_2022_PROGRAM_ID,
 } from '@solana/spl-token';
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { mplTokenMetadata, fetchDigitalAsset } from '@metaplex-foundation/mpl-token-metadata';
-import { fromWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
+import { mplTokenMetadata, safeFetchMetadataFromSeeds } from '@metaplex-foundation/mpl-token-metadata';
+import { fromWeb3JsPublicKey, toWeb3JsPublicKey } from '@metaplex-foundation/umi-web3js-adapters';
 import { unwrapOption } from '@metaplex-foundation/umi-options';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
@@ -1202,20 +1203,47 @@ async function loadLiteboardMintTxSigners(connection, sig, txOpts) {
 }
 
 /**
- * Matches how explorers label “creator”: Metaplex Token Metadata update authority or any
- * entry in the creators vec (verified or not — many launchpads skip on-chain verification).
+ * Metaplex Token Metadata PDA only (no full mint deserialize — Token-2022 extension mints
+ * otherwise break `fetchDigitalAsset` in mpl-toolbox).
  */
-async function walletMatchesMetaplexTokenMetadata(connection, mintPk, walletCanon) {
+async function walletMatchesMetaplexMetadataPda(connection, mintPk, walletCanon) {
   try {
     const umi = createUmi(connection).use(mplTokenMetadata());
-    const asset = await fetchDigitalAsset(umi, fromWeb3JsPublicKey(mintPk));
-    if (String(asset.metadata.updateAuthority) === walletCanon) return true;
-    const creators = unwrapOption(asset.metadata.creators);
+    const mintUmi = fromWeb3JsPublicKey(mintPk);
+    const meta = await safeFetchMetadataFromSeeds(umi, { mint: mintUmi });
+    if (!meta) return false;
+    const w = new PublicKey(walletCanon);
+    if (toWeb3JsPublicKey(meta.updateAuthority).equals(w)) return true;
+    const creators = unwrapOption(meta.creators);
     if (!Array.isArray(creators)) return false;
-    return creators.some((c) => String(c.address) === walletCanon);
+    return creators.some((c) => toWeb3JsPublicKey(c.address).equals(w));
   } catch {
     return false;
   }
+}
+
+/** SPL Token-2022 on-mint metadata extension (update authority only; no creators vec). */
+async function walletMatchesToken2022MetadataExtension(connection, mintPk, walletCanon) {
+  try {
+    const tm = await getTokenMetadata(
+      connection,
+      mintPk,
+      'confirmed',
+      TOKEN_2022_PROGRAM_ID
+    );
+    if (!tm?.updateAuthority) return false;
+    return tm.updateAuthority.toBase58() === walletCanon;
+  } catch {
+    return false;
+  }
+}
+
+async function walletMatchesMetadataOrToken2022Extension(connection, mintPk, walletCanon) {
+  const [mplex, t22] = await Promise.all([
+    walletMatchesMetaplexMetadataPda(connection, mintPk, walletCanon),
+    walletMatchesToken2022MetadataExtension(connection, mintPk, walletCanon),
+  ]);
+  return mplex || t22;
 }
 
 /**
@@ -1259,7 +1287,7 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
   }
 
   if (
-    await walletMatchesMetaplexTokenMetadata(
+    await walletMatchesMetadataOrToken2022Extension(
       dividendsConnection,
       mintPk,
       walletCanon
@@ -1313,7 +1341,7 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
   return {
     ok: false,
     error:
-      'Could not verify creator for this mint. We accept: (1) Metaplex metadata update authority or a listed creator wallet, (2) signing the earliest relevant on-chain mint transactions, or (3) current mint/freeze authority. Use the wallet explorers show as creator/update authority, or the one that signed the launch (not always the fee payer).',
+      'Could not verify creator on-chain for this mint. We match: Metaplex metadata (update authority or creators list), Token-2022 mint metadata extension update authority, early mint transactions, or current mint/freeze authority. If Solscan only shows a creator from off-chain JSON (not stored in metadata), that cannot be proven here.',
   };
 }
 
