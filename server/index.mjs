@@ -1715,6 +1715,33 @@ async function fetchSplMintDisplayMetadata(mintCanon) {
 }
 
 /**
+ * Add token_name / token_symbol to each row for GET /api/liteboards (explorer list).
+ * Bounded parallelism to avoid slamming RPC and Jupiter.
+ */
+async function enrichLiteboardsTokenMeta(rows, concurrency = 5) {
+  if (!rows?.length) return [];
+  const out = new Array(rows.length);
+  let next = 0;
+  async function worker() {
+    for (;;) {
+      const i = next++;
+      if (i >= rows.length) return;
+      const row = rows[i];
+      try {
+        const meta = await fetchSplMintDisplayMetadata(row.mint);
+        out[i] = { ...row, ...meta };
+      } catch (e) {
+        console.error('liteboard list token meta', row.mint, e);
+        out[i] = { ...row, token_name: null, token_symbol: null };
+      }
+    }
+  }
+  const pool = Math.min(Math.max(1, concurrency), rows.length);
+  await Promise.all(Array.from({ length: pool }, () => worker()));
+  return out;
+}
+
+/**
  * Liteboard deploy: Metaplex metadata (creator / update authority), creation-relevant mint txs,
  * or current mint/freeze authority.
  */
@@ -7306,7 +7333,23 @@ app.get('/api/liteboards', async (req, res) => {
     console.error(error);
     return res.status(500).json({ error: error.message });
   }
-  return res.json({ liteboards: data ?? [] });
+  const rows = data ?? [];
+  if (rows.length === 0) {
+    return res.json({ liteboards: [] });
+  }
+  try {
+    const enriched = await enrichLiteboardsTokenMeta(rows);
+    return res.json({ liteboards: enriched });
+  } catch (e) {
+    console.error('liteboard explorer enrich', e);
+    return res.json({
+      liteboards: rows.map((r) => ({
+        ...r,
+        token_name: null,
+        token_symbol: null,
+      })),
+    });
+  }
 });
 
 app.get('/api/liteboards/:mint', async (req, res) => {

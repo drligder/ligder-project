@@ -4,6 +4,7 @@ import { LoginDropdown } from '../components/LoginDropdown';
 import { useWallet } from '../contexts/WalletContext';
 import { useLigderProfile } from '../hooks/useLigderProfile';
 import { apiUrl } from '../lib/apiBase';
+import { liteboardTokenLabel } from '../lib/liteboardTokenLabel';
 import { parseApiJson } from '../lib/parseApiJson';
 
 type LiteboardRow = {
@@ -11,6 +12,8 @@ type LiteboardRow = {
   mint: string;
   owner_wallet: string;
   created_at: string;
+  token_name?: string | null;
+  token_symbol?: string | null;
 };
 
 const LiteboardExplorerPage = () => {
@@ -107,19 +110,32 @@ const LiteboardExplorerPage = () => {
           <p className="text-sm text-gray-600">No Liteboards yet{q.trim().length >= 3 ? ' for that search' : ''}.</p>
         ) : (
           <ul className="list-none m-0 p-0 border border-gray-300 divide-y divide-gray-200">
-            {rows.map((lb) => (
-              <li key={lb.id} className="p-3 hover:bg-gray-50">
-                <Link
-                  to={`/liteboard/${encodeURIComponent(lb.mint)}`}
-                  className="text-blue-800 font-mono text-sm break-all underline hover:text-blue-950"
-                >
-                  {lb.mint}
-                </Link>
-                <div className="text-xs text-gray-500 mt-1">
-                  Since {new Date(lb.created_at).toLocaleString()}
-                </div>
-              </li>
-            ))}
+            {rows.map((lb) => {
+              const label = liteboardTokenLabel(lb.token_name, lb.token_symbol);
+              return (
+                <li key={lb.id} className="p-0 hover:bg-gray-50">
+                  <Link
+                    to={`/liteboard/${encodeURIComponent(lb.mint)}`}
+                    className="block p-3 no-underline text-gray-900 hover:bg-gray-50"
+                  >
+                    {label ? (
+                      <div
+                        className="text-base font-bold mb-1 text-gray-900"
+                        style={{ fontFamily: 'Arial, sans-serif' }}
+                      >
+                        {label}
+                      </div>
+                    ) : null}
+                    <div className="text-blue-800 font-mono text-sm break-all underline hover:text-blue-950">
+                      {lb.mint}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      Since {new Date(lb.created_at).toLocaleString()}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
