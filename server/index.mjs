@@ -1435,17 +1435,30 @@ function solscanTokenMetaDataRoot(body) {
 }
 
 function solscanPayloadListsWalletAsCreator(data, walletCanon, depth = 0) {
-  if (!data || typeof data !== 'object' || depth > 8) return false;
+  if (!data || typeof data !== 'object' || depth > 10) return false;
   const strFields = [
     'creator',
     'owner',
     'tokenCreator',
     'mintAuthority',
+    'mint_authority',
     'freezeAuthority',
+    'freeze_authority',
     'authority',
     'updateAuthority',
+    'update_authority',
     'deployer',
     'tokenOwner',
+    'token_owner',
+    'creatorAddress',
+    'creator_address',
+    'firstMinter',
+    'first_minter',
+    'minter',
+    'signer',
+    'payer',
+    'fundedBy',
+    'funded_by',
   ];
   for (const f of strFields) {
     const v = data[f];
@@ -1481,14 +1494,70 @@ function solscanPayloadListsWalletAsCreator(data, walletCanon, depth = 0) {
     if (solscanPayloadListsWalletAsCreator(data.token, walletCanon, depth + 1))
       return true;
   }
+  if (data.profile && typeof data.profile === 'object') {
+    if (solscanPayloadListsWalletAsCreator(data.profile, walletCanon, depth + 1))
+      return true;
+  }
+  if (data.account && typeof data.account === 'object') {
+    if (solscanPayloadListsWalletAsCreator(data.account, walletCanon, depth + 1))
+      return true;
+  }
   return false;
+}
+
+/** Walk object for string values equal to wallet when parent key looks like a pubkey field (Solscan shapes vary). */
+function solscanLooseWalletStringMatch(obj, walletCanon, depth = 0) {
+  if (depth > 12 || obj == null) return false;
+  if (Array.isArray(obj)) {
+    return obj.some((x) => solscanLooseWalletStringMatch(x, walletCanon, depth + 1));
+  }
+  if (typeof obj !== 'object') return false;
+  for (const [k, v] of Object.entries(obj)) {
+    const kl = String(k).toLowerCase();
+    if (
+      /holders|holder|transfers|activities|instructions|logs|history|route|path|uri|url|image|symbol|name|description|twitter|telegram|website|ipfs|tokenaccount|token_account/.test(
+        kl
+      )
+    ) {
+      continue;
+    }
+    if (
+      typeof v === 'string' &&
+      v === walletCanon &&
+      /creator|owner|authority|minter|deploy|signer|wallet|payer|maker|dev|funded|by|user|address|account|pubkey|mint|freeze|update|token/.test(
+        kl
+      )
+    ) {
+      return true;
+    }
+    if (typeof v === 'object' && v !== null) {
+      if (solscanLooseWalletStringMatch(v, walletCanon, depth + 1)) return true;
+    }
+  }
+  return false;
+}
+
+function solscanBodyIndicatesWalletCreator(body, walletCanon) {
+  const root = solscanTokenMetaDataRoot(body);
+  if (!root) return false;
+  if (body?.success === false || body?.error) return false;
+  return (
+    solscanPayloadListsWalletAsCreator(root, walletCanon, 0) ||
+    solscanLooseWalletStringMatch(root, walletCanon, 0)
+  );
 }
 
 async function solscanTokenMetaCreatorMatches(mintCanonical, walletCanon) {
   if (!SOLSCAN_API_KEY) return false;
+  const e = encodeURIComponent(mintCanonical);
+  /** v2 token/meta uses `address` (not tokenAddress). v1 kept for compatibility. account/metadata often has token “creator” like the website profile. */
   const urls = [
-    `https://pro-api.solscan.io/v2.0/token/meta?tokenAddress=${encodeURIComponent(mintCanonical)}`,
-    `https://pro-api.solscan.io/v1.0/token/meta?tokenAddress=${encodeURIComponent(mintCanonical)}`,
+    `https://pro-api.solscan.io/v2.0/token/meta?address=${e}`,
+    `https://pro-api.solscan.io/v2.0/token/meta?tokenAddress=${e}`,
+    `https://pro-api.solscan.io/v1.0/token/meta?tokenAddress=${e}`,
+    `https://pro-api.solscan.io/v1.0/token/meta?address=${e}`,
+    `https://pro-api.solscan.io/v2.0/account/metadata?address=${e}`,
+    `https://pro-api.solscan.io/v1.0/account/metadata?address=${e}`,
   ];
   const headers = {
     accept: 'application/json',
@@ -1502,9 +1571,7 @@ async function solscanTokenMetaCreatorMatches(mintCanonical, walletCanon) {
       clearTimeout(t);
       if (!res.ok) continue;
       const body = await res.json();
-      const root = solscanTokenMetaDataRoot(body);
-      if (root && solscanPayloadListsWalletAsCreator(root, walletCanon, 0))
-        return true;
+      if (solscanBodyIndicatesWalletCreator(body, walletCanon)) return true;
     } catch {
       /* try next URL */
     }
