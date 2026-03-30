@@ -50,7 +50,7 @@ const LigderGeneralPage = () => {
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      <div className="max-w-5xl mx-auto px-4 py-5 sm:px-6 sm:py-6">
         <div
           className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm"
           style={{ fontFamily: 'Arial, sans-serif' }}
