@@ -43,7 +43,7 @@
 
 .section-header {
   font-family: Arial, sans-serif;
-  font-size: 1.5rem;
+  font-size: clamp(1.125rem, 4vw, 1.5rem);
   font-weight: bold;
   color: #000000;
   margin-bottom: 1.25rem;
@@ -51,6 +51,8 @@
   border-bottom: 1px solid #d1d5db;
   padding-bottom: 0.5rem;
   text-align: left;
+  line-height: 1.25;
+  word-break: break-word;
 }
 
 .academic-text {
@@ -359,6 +361,34 @@
 /* Forums (bitcointalk-style tables) */
 .forum-table-wrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* Fixed-layout tables need a floor width on narrow viewports — scroll horizontally instead of crushing columns */
+@media (max-width: 639px) {
+  .forum-table-wrap .forum-table {
+    min-width: 34rem;
+  }
+}
+
+/* Thread posts: sidebar + body row → stack on small screens */
+@media (max-width: 639px) {
+  .forum-thread-post {
+    flex-direction: column;
+  }
+
+  .forum-thread-post-sidebar {
+    width: 100% !important;
+    max-width: 100%;
+    border-right: none !important;
+    border-bottom: 1px solid #d1d5db;
+  }
+
+  /* Reply depth indent uses inline marginLeft; disable on phone so body stays readable */
+  .forum-thread-post-body {
+    margin-left: 0 !important;
+  }
 }
 
 .forum-table-head {
