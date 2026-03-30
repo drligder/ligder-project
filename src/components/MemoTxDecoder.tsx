@@ -169,7 +169,14 @@ export function MemoTxDecoder({ variant = 'default' }: MemoTxDecoderProps) {
 
   return (
     <section className={sectionClass} style={{ fontFamily: 'Arial, sans-serif' }}>
-      <h2 className={`text-lg font-bold text-gray-900 m-0 mb-2 ${isArchive ? 'section-header' : ''}`}>
+      <h2
+        className={
+          isArchive
+            ? 'ligder-pixel-title m-0 mb-4 text-center text-gray-900'
+            : 'm-0 mb-2 text-lg font-bold text-gray-900'
+        }
+        style={isArchive ? { fontSize: 'clamp(1.5rem, 4vw, 2.25rem)' } : undefined}
+      >
         Verify attestation (Memo transaction)
       </h2>
       <p className="text-sm text-gray-700 m-0 mb-2" style={{ fontFamily: 'Times New Roman, serif' }}>
