@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { LoginDropdown } from '../components/LoginDropdown';
+import { useToast } from '../contexts/ToastContext';
 import { useLigderProfile } from '../hooks/useLigderProfile';
 import { useWallet } from '../contexts/WalletContext';
 import { apiUrl } from '../lib/apiBase';
 import { formatUsdMarketCap, formatUsdPerToken } from '../lib/formatUsd';
 import { liteboardTokenLabel } from '../lib/liteboardTokenLabel';
 import { parseApiJson } from '../lib/parseApiJson';
+import { uint8ToBase64 } from '../lib/uint8Base64';
 
 const LiteboardHubPage = () => {
   const { mint: mintParam } = useParams<{ mint: string }>();
   const mint = mintParam ? decodeURIComponent(mintParam) : '';
-  const { publicKey } = useWallet();
-  const { isRegistered, profileLoading } = useLigderProfile();
+  const navigate = useNavigate();
+  const { publicKey, signMessage } = useWallet();
+  const { showToast } = useToast();
+  const { profileLoading } = useLigderProfile();
   const showRegister = publicKey ? !profileLoading && !isRegistered : true;
 
   const [lb, setLb] = useState<{
@@ -27,6 +31,7 @@ const LiteboardHubPage = () => {
   } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     if (!mint) {
@@ -69,12 +74,54 @@ const LiteboardHubPage = () => {
 
   const encMint = encodeURIComponent(mint);
   const tokenLabel = lb != null ? liteboardTokenLabel(lb.token_name, lb.token_symbol) : null;
+  const isOwner = Boolean(publicKey && lb && publicKey === lb.owner_wallet);
+
+  const deleteLiteboard = async () => {
+    if (!publicKey || !lb) return;
+    if (
+      !window.confirm(
+        'Remove this Liteboard permanently? All threads and posts will be deleted. This cannot be undone.'
+      )
+    ) {
+      return;
+    }
+    const nonce = crypto.randomUUID();
+    const message = [
+      'Ligder liteboard delete',
+      `Wallet: ${publicKey}`,
+      `Mint: ${lb.mint}`,
+      `Nonce: ${nonce}`,
+    ].join('\n');
+    setDeleting(true);
+    try {
+      const sig = await signMessage(new TextEncoder().encode(message));
+      const r = await fetch(apiUrl('/api/liteboard/delete'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wallet: publicKey,
+          message,
+          signature: uint8ToBase64(sig),
+        }),
+      });
+      const j = await parseApiJson<{ ok?: boolean; error?: string }>(r);
+      if (!r.ok) {
+        throw new Error(j.error || 'Delete failed');
+      }
+      showToast('Liteboard removed.', 'success');
+      navigate('/liteboard/explorer');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Delete failed', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      <div className="max-w-3xl mx-auto px-6 py-6">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100/80 to-white text-gray-900">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
         <div
-          className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm"
+          className="mb-6 flex flex-wrap items-center justify-between gap-3 text-sm"
           style={{ fontFamily: 'Arial, sans-serif' }}
         >
           <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -88,7 +135,7 @@ const LiteboardHubPage = () => {
           <div className="flex items-center gap-2">
             <LoginDropdown />
             {showRegister ? (
-              <Link to="/forums/register" className="text-sm px-3 py-1.5 border border-gray-400 bg-white text-blue-700">
+              <Link to="/forums/register" className="text-sm px-3 py-1.5 border border-gray-400 bg-white text-blue-700 rounded shadow-sm">
                 Register
               </Link>
             ) : null}
@@ -96,65 +143,98 @@ const LiteboardHubPage = () => {
         </div>
 
         {loading ? (
-          <p className="text-sm text-gray-600">Loading…</p>
+          <p className="text-sm text-slate-600">Loading…</p>
         ) : err ? (
           <p className="text-sm text-red-800">{err}</p>
         ) : lb ? (
           <>
-            <h1 className="text-xl font-bold mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
               {tokenLabel ?? 'Liteboard'}
             </h1>
             {tokenLabel ? (
-              <p className="text-xs text-gray-600 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+              <p className="text-xs text-slate-500 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
                 Liteboard
               </p>
             ) : null}
-            <p className="text-xs font-mono text-gray-700 break-all mb-3">{lb.mint}</p>
+            <p className="text-xs font-mono text-slate-700 break-all mb-6">{lb.mint}</p>
+
             {(lb.usd_market_cap != null && Number.isFinite(lb.usd_market_cap)) ||
             (lb.token_price_usd != null && Number.isFinite(lb.token_price_usd)) ? (
-              <p
-                className="text-sm text-gray-800 mb-6"
-                style={{ fontFamily: 'Arial, sans-serif' }}
-              >
-                <span className="text-gray-600">Market cap </span>
-                {formatUsdMarketCap(lb.usd_market_cap ?? null)}
-                <span className="text-gray-500 mx-2">·</span>
-                <span className="text-gray-600">1 token = </span>
-                {formatUsdPerToken(lb.token_price_usd ?? null)}
-                <span className="block text-xs text-gray-500 mt-1 font-normal">
-                  pump.fun: <code className="text-xs bg-gray-100 px-1">usd_market_cap</code> ÷ 10⁹ for implied
-                  $/token.
-                </span>
-              </p>
+              <div className="mb-8">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                  Market (pump.fun)
+                </p>
+                <div className="grid grid-cols-2 gap-3 max-w-md">
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Mkt cap</div>
+                    <div className="text-lg font-semibold text-slate-900 tabular-nums">
+                      {formatUsdMarketCap(lb.usd_market_cap ?? null)}
+                    </div>
+                  </div>
+                  <div
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"
+                    title="usd_market_cap ÷ 10⁹"
+                  >
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">1 token</div>
+                    <div className="text-lg font-semibold text-slate-900 tabular-nums">
+                      {formatUsdPerToken(lb.token_price_usd ?? null)}
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 mt-2 m-0" style={{ fontFamily: 'Arial, sans-serif' }}>
+                  Implied $/token uses <code className="text-xs bg-slate-100 px-1 rounded">usd_market_cap</code> ÷ 10⁹.
+                </p>
+              </div>
             ) : (
-              <p className="text-xs text-gray-500 mb-6" style={{ fontFamily: 'Arial, sans-serif' }}>
+              <p className="text-xs text-slate-500 mb-8" style={{ fontFamily: 'Arial, sans-serif' }}>
                 Market data unavailable (mint not on pump.fun index).
               </p>
             )}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <Link
                 to={`/liteboard/${encMint}/announcement`}
-                className="block border border-gray-400 p-4 hover:bg-gray-50 no-underline text-gray-900"
+                className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow no-underline text-gray-900"
               >
                 <h2 className="text-base font-bold m-0 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
                   Announcement
                 </h2>
-                <p className="text-sm text-gray-600 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
+                <p className="text-sm text-slate-600 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
                   Owner-only updates for this token.
                 </p>
               </Link>
               <Link
                 to={`/liteboard/${encMint}/general`}
-                className="block border border-gray-400 p-4 hover:bg-gray-50 no-underline text-gray-900"
+                className="block rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow no-underline text-gray-900"
               >
                 <h2 className="text-base font-bold m-0 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
                   General
                 </h2>
-                <p className="text-sm text-gray-600 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
+                <p className="text-sm text-slate-600 m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
                   Community chat for registered Ligder users.
                 </p>
               </Link>
             </div>
+
+            {isOwner ? (
+              <div className="mt-10 pt-6 border-t border-red-200/80 rounded-t-lg">
+                <p className="text-sm font-semibold text-red-900 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+                  Danger zone
+                </p>
+                <p className="text-xs text-red-800/90 mb-3 m-0 max-w-xl" style={{ fontFamily: 'Arial, sans-serif' }}>
+                  Remove this Liteboard and all of its threads and posts. You must sign with the deploy wallet.
+                </p>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => void deleteLiteboard()}
+                  className="text-sm px-4 py-2 border border-red-800 bg-white text-red-900 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  style={{ fontFamily: 'Arial, sans-serif' }}
+                >
+                  {deleting ? 'Signing…' : 'Remove Liteboard'}
+                </button>
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>
