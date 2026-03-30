@@ -58,6 +58,10 @@ const LITEBOARD_USE_SOLSCAN_CREATOR =
   process.env.LITEBOARD_USE_SOLSCAN_CREATOR === '1' ||
   /^(true|yes)$/i.test(process.env.LITEBOARD_USE_SOLSCAN_CREATOR?.trim() ?? '');
 const LITEBOARD_DEBUG_SOLSCAN = process.env.LITEBOARD_DEBUG_SOLSCAN === '1';
+/** pump.fun public coin API (creator + name/symbol). Set LITEBOARD_USE_PUMP_FUN=0 to disable outbound calls. */
+const LITEBOARD_USE_PUMP_FUN =
+  process.env.LITEBOARD_USE_PUMP_FUN !== '0' &&
+  !/^(false|no)$/i.test(process.env.LITEBOARD_USE_PUMP_FUN?.trim() ?? '');
 const SOLANA_MEMO_RPC_URL = process.env.SOLANA_MEMO_RPC_URL?.trim() || SOLANA_RPC_URL;
 const SOLANA_MEMO_FEE_PAYER_SECRET_KEY_RAW =
   process.env.SOLANA_MEMO_FEE_PAYER_SECRET_KEY?.trim() || '';
@@ -1622,8 +1626,40 @@ function trimSplMetaDisplayString(raw) {
 }
 
 /**
+ * pump.fun frontend API — coin record includes creator, name, symbol (e.g. pump / launchpad tokens).
+ * @see https://frontend-api-v3.pump.fun/coins/{mint}
+ */
+async function fetchPumpFunCoinRecord(mintCanon) {
+  if (!LITEBOARD_USE_PUMP_FUN) return null;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12_000);
+  try {
+    const res = await fetch(
+      `https://frontend-api-v3.pump.fun/coins/${encodeURIComponent(mintCanon)}`,
+      {
+        signal: ctrl.signal,
+        redirect: 'follow',
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'LigderLiteboard/1',
+        },
+      }
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => null);
+    if (!body || typeof body !== 'object') return null;
+    return body;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/**
  * Human-readable token name + ticker for UI (hub, etc.).
- * Order: Metaplex metadata PDA → Token-2022 on-mint extension → Jupiter token list CDN / lite-api.
+ * Order: Metaplex metadata PDA → Token-2022 on-mint extension → pump.fun (if listed) → Jupiter token list CDN / lite-api.
  */
 async function fetchSplMintDisplayMetadata(mintCanon) {
   const empty = { token_name: null, token_symbol: null };
@@ -1671,6 +1707,18 @@ async function fetchSplMintDisplayMetadata(mintCanon) {
       if (tm) {
         if (!token_name) token_name = trimSplMetaDisplayString(tm.name);
         if (!token_symbol) token_symbol = trimSplMetaDisplayString(tm.symbol);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if ((!token_name || !token_symbol) && LITEBOARD_USE_PUMP_FUN) {
+    try {
+      const pump = await fetchPumpFunCoinRecord(mintCanon);
+      if (pump) {
+        if (!token_name) token_name = trimSplMetaDisplayString(pump.name);
+        if (!token_symbol) token_symbol = trimSplMetaDisplayString(pump.symbol);
       }
     } catch {
       /* ignore */
@@ -1787,6 +1835,18 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
     return { ok: true, mint: mintCanonical };
   }
 
+  if (LITEBOARD_USE_PUMP_FUN) {
+    try {
+      const pump = await fetchPumpFunCoinRecord(mintCanonical);
+      const pumpCreator = pump?.creator != null ? trimSplMetaDisplayString(pump.creator) : null;
+      if (pumpCreator === walletCanon) {
+        return { ok: true, mint: mintCanonical };
+      }
+    } catch (e) {
+      console.error('liteboard pump.fun creator check', e);
+    }
+  }
+
   if (SOLSCAN_API_KEY && LITEBOARD_USE_SOLSCAN_CREATOR) {
     try {
       if (await solscanTokenMetaCreatorMatches(mintCanonical, walletCanon)) {
@@ -1856,7 +1916,7 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
   return {
     ok: false,
     error:
-      'Could not verify creator for this mint. We use on-chain checks: Metaplex metadata, Token-2022 mint metadata extension, JSON at the on-chain metadata URI, early mint transactions (signers), and current mint/freeze authority. Optional: set LITEBOARD_USE_SOLSCAN_CREATOR=1 with SOLSCAN_API_KEY to also try Solscan Pro JSON (off by default). Use the wallet that signed the launch; RPC must be mainnet for that mint.',
+      'Could not verify creator for this mint. We use on-chain checks, pump.fun coin API when the mint is listed there (creator field), Metaplex metadata, Token-2022 mint metadata extension, JSON at the on-chain metadata URI, early mint transactions (signers), and current mint/freeze authority. Optional: set LITEBOARD_USE_SOLSCAN_CREATOR=1 with SOLSCAN_API_KEY for Solscan Pro. Set LITEBOARD_USE_PUMP_FUN=0 to skip pump.fun. Use the wallet that signed the launch; RPC must be mainnet for that mint.',
   };
 }
 
