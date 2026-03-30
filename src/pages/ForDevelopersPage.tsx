@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { LoginDropdown } from '../components/LoginDropdown';
-
-const REPO_URL = 'https://github.com/drligder/ligder-project';
+import { githubRepoUrl } from '../config/projectPublic';
 
 const ForDevelopersPage = () => {
   return (
@@ -48,7 +47,7 @@ const ForDevelopersPage = () => {
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <a
-              href={REPO_URL}
+              href={githubRepoUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-sm px-4 py-2 border border-gray-700 bg-white text-blue-700 hover:text-blue-900 hover:bg-gray-100"

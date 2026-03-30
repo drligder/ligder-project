@@ -1,4 +1,7 @@
 import 'dotenv/config';
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import http from 'http';
 import crypto from 'crypto';
 import cors from 'cors';
@@ -27,6 +30,18 @@ import { unwrapOption } from '@metaplex-foundation/umi-options';
 import nacl from 'tweetnacl';
 import bs58 from 'bs58';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+function readProjectPublicMint() {
+  try {
+    const p = join(__dirname, '..', 'project.public.json');
+    const data = JSON.parse(readFileSync(p, 'utf8'));
+    return typeof data?.liteTokenMint === 'string' ? data.liteTokenMint.trim() : '';
+  } catch {
+    return '';
+  }
+}
+
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
 const RESERVED = new Set([
   'admin',
@@ -49,7 +64,8 @@ const LISTEN_HOST =
   DEV_VITE ? '127.0.0.1' : (process.env.LISTEN_HOST?.trim() || '0.0.0.0');
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const LITE_TOKEN_MINT = process.env.LITE_TOKEN_MINT?.trim() || '';
+const LITE_TOKEN_MINT =
+  process.env.LITE_TOKEN_MINT?.trim() || readProjectPublicMint();
 const SOLANA_RPC_URL =
   process.env.SOLANA_RPC_URL?.trim() || 'https://api.mainnet-beta.solana.com';
 /** Solscan Pro API — only used when LITEBOARD_USE_SOLSCAN_CREATOR=1 (off by default; API/UI often disagree). */

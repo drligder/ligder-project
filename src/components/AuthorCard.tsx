@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-
-const LITE_TOKEN_ADDRESS = 'TBA';
+import {
+  githubRepoUrl,
+  liteTokenMintCanCopy,
+  liteTokenMintDisplay,
+  twitterProfileUrl,
+} from '../config/projectPublic';
 
 function IconGitHub({ className }: { className?: string }) {
   return (
@@ -21,12 +25,12 @@ function IconX({ className }: { className?: string }) {
 
 const AuthorCard = () => {
   const [copied, setCopied] = useState(false);
-  const canCopy = LITE_TOKEN_ADDRESS !== 'TBA';
+  const canCopy = liteTokenMintCanCopy;
 
   const handleCopy = async () => {
     if (!canCopy) return;
     try {
-      await navigator.clipboard.writeText(LITE_TOKEN_ADDRESS);
+      await navigator.clipboard.writeText(liteTokenMintDisplay);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1200);
     } catch {
@@ -65,7 +69,7 @@ const AuthorCard = () => {
           </div>
           <div className="author-photo-socials" aria-label="Social">
             <a
-              href="https://github.com/drligder/ligder-project"
+              href={githubRepoUrl}
               className="author-social-icon"
               target="_blank"
               rel="noopener noreferrer"
@@ -75,7 +79,7 @@ const AuthorCard = () => {
             </a>
             <span className="author-social-vsep" aria-hidden="true" />
             <a
-              href="https://x.com/Doctor_Ligder"
+              href={twitterProfileUrl}
               className="author-social-icon"
               target="_blank"
               rel="noopener noreferrer"
@@ -96,7 +100,7 @@ const AuthorCard = () => {
             <div className="token-address-row">
               <div className="token-address-value">
                 <span style={{ fontFamily: 'Times New Roman, serif' }}>$LITE:</span>{' '}
-                <span>{LITE_TOKEN_ADDRESS}</span>
+                <span>{liteTokenMintDisplay}</span>
               </div>
               <button
                 className="token-copy-button"

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { githubRepoUrl, twitterProfileUrl } from '../config/projectPublic';
 
 const SiteFooter = () => {
   return (
@@ -34,7 +35,7 @@ const SiteFooter = () => {
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <a
-            href="https://github.com/drligder/ligder-project"
+            href={githubRepoUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-700 hover:text-blue-900 underline"
@@ -43,7 +44,7 @@ const SiteFooter = () => {
           </a>
           <span className="text-gray-400">|</span>
           <a
-            href="https://x.com/Doctor_Ligder"
+            href={twitterProfileUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-700 hover:text-blue-900 underline"
