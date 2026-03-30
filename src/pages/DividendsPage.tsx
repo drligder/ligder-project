@@ -467,13 +467,12 @@ const DividendsPage = () => {
           </h1>
 
           <p className="text-sm text-gray-700 mb-0 leading-relaxed" style={{ fontFamily: 'Times New Roman, serif' }}>
-            Pump / pool fees are moved from the dev wallet into the project treasury. Each period, the
-            server records how much LITE arrived, splits it (75% claimable / 25% management reserve),
-            snapshots every registered wallet&apos;s on-chain balance, and assigns a fixed entitlement
-            per wallet. You claim by signing a message only; the relay wallet pays the Solana fee (and
-            ATA rent if needed) and the treasury wallet authorizes the SPL LITE transfer to your wallet
-            if you still meet the holding tolerance. The treasury needs <strong>LITE</strong> for
-            payouts, not SOL for claim transactions—the relay wallet should stay funded with SOL.
+            A share of trading and pool fees is routed into the project treasury as <strong>LITE</strong>.
+            Each period, the system records how much arrived, splits it (75% to holders, 25% to
+            management), takes a snapshot of every registered wallet&apos;s on-chain balance, and assigns
+            a fixed entitlement per wallet. To claim, you <strong>sign a message only</strong>—no LITE
+            leaves your wallet for that step. If you meet the holding rule, LITE is sent from the
+            treasury to your account; network fees for that payout are covered for you.
           </p>
         </section>
 
@@ -795,64 +794,69 @@ const DividendsPage = () => {
               className="text-xl font-bold text-gray-900 mb-2 text-center sm:text-left"
               style={{ fontFamily: 'Arial, sans-serif' }}
             >
-              Technical specification
+              How dividends work
             </h2>
             <p
               className="text-sm text-gray-600 mb-8 text-center sm:text-left leading-relaxed max-w-2xl"
               style={{ fontFamily: 'Times New Roman, serif' }}
             >
-              Same rules the server uses—just laid out so you can skim the story first, then dig into
-              the details. Nothing here is legal or investment advice; it&apos;s how the app behaves.
+              The sections below describe the program from a <strong>LITE holder&apos;s</strong> point of
+              view: where the money comes from, how your share is calculated, and what you need to do to
+              claim. Nothing here is legal or tax advice; it explains how this site and the on-chain
+              payouts are designed to behave.
             </p>
 
             <div className="space-y-5 sm:space-y-6">
               <SpecCard
                 label="Overview"
                 title="From fees to your wallet"
-                kicker="Fees land in the dev wallet, you forward LITE to treasury, we record deposits, split the pot, snapshot balances, then you claim with a signature."
+                kicker="Period by period, LITE that reaches the treasury is split between eligible holders and a management reserve. Your share depends on how much LITE you held at snapshot, relative to other registered holders."
               >
                 <SpecNumbered
                   items={[
                     {
                       body: (
                         <>
-                          Pool / trading fees show up as LITE (and other assets) where you claim them.
-                          You move LITE from the dev wallet into the project treasury on Solana.
+                          Trading and pool fees accrue as LITE (and other assets where venues pay them).
+                          The project consolidates LITE into the on-chain treasury that funds these
+                          distributions.
                         </>
                       ),
                     },
                     {
                       body: (
                         <>
-                          Staff paste the <strong>transfer tx signature</strong> into the admin tool.
-                          The API parses the chain transaction: one sender down, treasury up, same mint (
-                          <span className="font-mono text-[13px]">LITE_TOKEN_MINT</span>
-                          ). Each signature is stored once.
+                          Each amount credited to a period must match a real Solana transfer into that
+                          treasury (correct mint, expected flow). Transfers are recorded once—no double
+                          counting.
                         </>
                       ),
                     },
                     {
                       body: (
                         <>
-                          The deposit is booked into the <strong>current 6-hour bucket</strong> (see
-                          Timing below) using server time when it was submitted.
+                          Deposits are grouped into <strong>six-hour windows</strong> (see Timing). New
+                          deposits add to the open bucket until that window ends.
                         </>
                       ),
                     },
                     {
                       body: (
                         <>
-                          When that bucket closes, the job <strong>finalizes</strong>: sum deposits,
-                          apply 75% / 25%, read every registered wallet&apos;s LITE via RPC, write
-                          entitlements.
+                          When the window closes, the period <strong>finalizes</strong>: deposits are
+                          summed, split 75% to the claimable pool and 25% to management, and every{' '}
+                          <strong>registered</strong> wallet&apos;s LITE balance is read from the chain.
                         </>
                       ),
                     },
                     {
                       body: (
                         <>
-                          You hit <strong>Claim</strong>, sign a short message in Phantom, and the
-                          treasury sends your LITE—if you still pass the holding check.
+                          You open this page, connect the same wallet you registered with, and press{' '}
+                          <strong>Claim</strong> when you have an entitlement and the window is open. You
+                          only sign a message—no LITE leaves your wallet for that step. If you still meet
+                          the holding rule, LITE is sent from the treasury to you; network fees for that
+                          payout are covered so you are not charged SOL to receive your dividend.
                         </>
                       ),
                     },
@@ -863,47 +867,45 @@ const DividendsPage = () => {
               <SpecCard
                 label="Timing"
                 title="Six-hour windows"
-                kicker="Everyone shares the same clock slices so accounting stays simple and auditable."
+                kicker="Everyone uses the same schedule (UTC-based), so the books stay simple and comparable across holders."
               >
                 <SpecBullets
                   items={[
                     <>
-                      The day is cut into <strong>6-hour</strong> segments from Unix epoch:{' '}
+                      Time is divided into <strong>6-hour</strong> segments aligned to the Unix clock:{' '}
                       <span className="font-mono text-[13px]">period_start = floor(now / 21600) * 21600</span>{' '}
-                      seconds, and <span className="font-mono text-[13px]">period_end = period_start + 21600</span>.
+                      and <span className="font-mono text-[13px]">period_end = period_start + 21600</span>{' '}
+                      (seconds).
                     </>,
                     <>
-                      Before <span className="font-mono text-[13px]">period_end</span> the bucket is{' '}
-                      <strong>open</strong>. After that, the background job finalizes it and writes who gets what.
+                      Before <span className="font-mono text-[13px]">period_end</span>, that period is still{' '}
+                      <strong>open</strong> for deposits. After the boundary, it finalizes and entitlements
+                      are fixed for that bucket.
                     </>,
                     <>
-                      For the <strong>latest finalized</strong> snapshot you can claim during the next
-                      window—roughly until the next boundary (the countdown bar above is your visual cue).
+                      For the <strong>latest finalized</strong> period, you can claim during the following
+                      window—use the countdown above as a rough guide until the next boundary.
                     </>,
                   ]}
                 />
               </SpecCard>
 
               <SpecCard
-                label="Trust"
-                title="Deposit checks (admin)"
-                kicker="We never trust a pasted string until the chain agrees."
+                label="Verification"
+                title="Why credited deposits are trustworthy"
+                kicker="Only transfers that the chain confirms—into the right treasury, in LITE—count toward a period."
               >
                 <p>
-                  If the tx mixes unrelated LITE movements or we can&apos;t identify exactly one sender,
-                  the deposit is dropped. Optionally, set{' '}
-                  <span className="font-mono text-[13px]">SPL_DIVIDEND_SENDER</span> (public base58) so
-                  only that wallet may be the LITE sender; the receiver is always inferred as the
-                  treasury from <span className="font-mono text-[13px]">TREASURY_WALLET_SECRET_KEY</span>.
-                  Legacy name <span className="font-mono text-[13px]">DIVIDENDS_DEV_WALLET</span> still
-                  works.
+                  If a transaction can&apos;t be matched cleanly (wrong mint, muddled senders, or
+                  ambiguous flows), it isn&apos;t booked. That way the numbers you see reflect real LITE
+                  that actually arrived in the treasury, not a pasted note or an unrelated transfer.
                 </p>
               </SpecCard>
 
               <SpecCard
                 label="Snapshot"
                 title="Who counts in the split"
-                kicker="Registration matters: the snapshot only looks at Ligder profiles, not every token holder on Earth."
+                kicker="Only registered Ligder wallets are included—not every LITE holder worldwide."
               >
                 <SpecBullets
                   items={[
@@ -924,10 +926,15 @@ const DividendsPage = () => {
                 />
               </SpecCard>
 
-              <SpecCard label="Math" title="How the pot is split" tone="muted" kicker="All on-chain math uses integer base units (6 decimals for LITE).">
+              <SpecCard
+                label="Math"
+                title="How the pot is split"
+                tone="muted"
+                kicker="Amounts are calculated in tiny on-chain units (6 decimal places for LITE); the interface shows normal LITE amounts."
+              >
                 <p className="text-gray-700">
                   One full LITE = <span className="font-mono text-[13px]">1_000_000</span> raw units.
-                  The UI shows human amounts; the server uses raw integers end-to-end.
+                  What you read in the UI is converted from those integers so rounding matches the contract.
                 </p>
                 <div className="rounded-md bg-white border border-gray-200 p-4 shadow-inner">
                   <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
@@ -946,17 +953,17 @@ share_bps_i = floor(10000 * b_i / S)   // for display`}
                   </pre>
                 </div>
                 <p className="text-gray-700 pt-1">
-                  <span className="font-semibold text-gray-900">In plain terms:</span> your piece grows
-                  with <span className="font-mono text-[13px]">b_i / S</span>—your share of LITE among
-                  registered holders at snapshot, not your share of the whole 1B supply unless the whole
-                  world is in Ligder.
+                  <span className="font-semibold text-gray-900">In plain terms:</span> your share grows with{' '}
+                  <span className="font-mono text-[13px]">b_i / S</span>—your fraction of LITE held at
+                  snapshot among <em>registered</em> holders, not necessarily your fraction of total LITE
+                  supply.
                 </p>
               </SpecCard>
 
               <SpecCard
                 label="Example"
                 title="Tiny numbers, same rules"
-                kicker="Illustrative only—your real entitlement shows in the table when you connect."
+                kicker="Illustrative only—when you connect your wallet, this page shows your real entitlement."
               >
                 <p>
                   Say <span className="font-mono text-[13px]">D = 1_000_000_000</span> raw (= 1 LITE
@@ -973,40 +980,41 @@ share_bps_i = floor(10000 * b_i / S)   // for display`}
               <SpecCard
                 label="For you"
                 title="Claiming in practice"
-                kicker="Four short steps—most of the work is one Phantom signature."
+                kicker="Four steps—only one of them is a wallet signature."
               >
                 <SpecNumbered
                   items={[
                     {
                       body: (
                         <>
-                          <strong>Register</strong> with the wallet you&apos;ll use to claim (must match
-                          Phantom).
+                          <strong>Register</strong> on Ligder with the wallet you will use to claim (same
+                          address as in Phantom).
                         </>
                       ),
                     },
                     {
                       body: (
                         <>
-                          <strong>Connect</strong> here and wait until you see an entitlement and the
-                          window is open.
+                          <strong>Connect</strong> on this page. When you have an entitlement and the
+                          claim window is open, the Claim button is available.
                         </>
                       ),
                     },
                     {
                       body: (
                         <>
-                          <strong>Claim</strong> → sign the message (wallet, period, nonce). No LITE
-                          leaves your wallet for this step.
+                          Click <strong>Claim</strong> and sign the message (wallet, period, nonce). Signing
+                          does not send LITE out of your wallet.
                         </>
                       ),
                     },
                     {
                       body: (
                         <>
-                          The server verifies, applies the 90% rule, then broadcasts an on-chain tx: the
-                          relay wallet pays the Solana fee (and rent if your ATA is created), and the
-                          treasury authorizes the LITE transfer to your associated token account.
+                          The site checks eligibility (including the 90% holding rule), then submits the
+                          payout on-chain: LITE moves from the treasury to your LITE account. You do not
+                          pay the Solana network fee for that transfer; if your token account needs to be
+                          created, that cost is covered as well.
                         </>
                       ),
                     },
@@ -1014,7 +1022,11 @@ share_bps_i = floor(10000 * b_i / S)   // for display`}
                 />
               </SpecCard>
 
-              <SpecCard label="Rules" title="Eligibility cheat sheet" kicker="Quick checklist before you expect a payout.">
+              <SpecCard
+                label="Rules"
+                title="What you need to be eligible"
+                kicker="Quick checklist if you are troubleshooting a claim."
+              >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="rounded-md border border-gray-200 bg-white/80 p-3">
                     <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
@@ -1045,11 +1057,11 @@ share_bps_i = floor(10000 * b_i / S)   // for display`}
                   </div>
                   <div className="rounded-md border border-gray-200 bg-white/80 p-3 sm:col-span-2">
                     <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
-                      Treasury
+                      Treasury &amp; safety
                     </p>
                     <p className="text-sm text-gray-800">
-                      The treasury key authorizes moving LITE; the same relay wallet as forum memos pays
-                      network fees. Neither secret is in the browser.
+                      Payouts are authorized by the project treasury on-chain. Fee keys never appear in your
+                      browser—you only ever sign a plain-text claim message with your own wallet.
                     </p>
                   </div>
                 </div>
