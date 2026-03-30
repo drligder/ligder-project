@@ -103,7 +103,7 @@ const LiteboardExplorerPage = () => {
         </div>
 
         <div className="mb-6">
-          <h1 className="ligder-pixel-title text-2xl tracking-tight text-slate-900 mb-1">
+          <h1 className="ligder-pixel-title text-4xl tracking-tight text-slate-900 mb-1">
             Liteboard Explorer
           </h1>
           <p className="text-sm text-slate-600 max-w-2xl" style={{ fontFamily: 'Times New Roman, serif' }}>

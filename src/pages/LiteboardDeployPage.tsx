@@ -143,7 +143,7 @@ const LiteboardDeployPage = () => {
           </div>
         </div>
 
-        <div className="mb-5 flex justify-center border border-gray-300 bg-gray-50 p-2">
+        <div className="mb-5 flex justify-center border border-gray-300 bg-white p-2">
           <img
             src="/images/fig035-01.gif"
             alt=""
@@ -152,7 +152,7 @@ const LiteboardDeployPage = () => {
           />
         </div>
 
-        <h1 className="ligder-pixel-title text-xl text-gray-900 mb-2">
+        <h1 className="ligder-pixel-title text-3xl text-gray-900 mb-2">
           Deploy a Liteboard
         </h1>
         <p className="text-sm text-gray-700 mb-3" style={{ fontFamily: 'Times New Roman, serif' }}>
