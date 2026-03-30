@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LoginDropdown } from '../components/LoginDropdown';
 import { RegistrationWelcomeModal } from '../components/RegistrationWelcomeModal';
 import { ForumBoardsTable } from '../components/forum';
 import { useWallet } from '../contexts/WalletContext';
 import { useForumAccount } from '../hooks/useForumAccount';
-import { LIGDER_PROFILE_UPDATED_EVENT, useLigderProfile } from '../hooks/useLigderProfile';
+import { useLigderProfile } from '../hooks/useLigderProfile';
 import { apiUrl, describeForumApiFailure } from '../lib/apiBase';
 import { parseApiJson } from '../lib/parseApiJson';
 import type { ForumBoardRow } from '../types/forumBoards';
@@ -51,13 +51,12 @@ const ForumPage = () => {
   const navigate = useNavigate();
   const { publicKey } = useWallet();
   const { username, isRegistered, profileLoading } = useLigderProfile();
-  const { isAdmin, isModerator } = useForumAccount();
+  const { isAdmin, isModerator, avatarUrl: profileAvatarUrl } = useForumAccount();
   const showRegister = publicKey ? !profileLoading && !isRegistered : true;
 
   const [now, setNow] = useState(() => new Date());
   const [welcomeModalOpen, setWelcomeModalOpen] = useState(false);
   const [welcomeModalUser, setWelcomeModalUser] = useState<string | null>(null);
-  const [profileAvatarUrl, setProfileAvatarUrl] = useState<string | null>(null);
   const [ligderBoards, setLigderBoards] = useState<ForumBoardRow[]>([]);
   const [generalBoards, setGeneralBoards] = useState<ForumBoardRow[]>([]);
   const [technicalBoards, setTechnicalBoards] = useState<ForumBoardRow[]>([]);
@@ -65,25 +64,6 @@ const ForumPage = () => {
   const [canSeeGovernance, setCanSeeGovernance] = useState(false);
   const [boardsLoading, setBoardsLoading] = useState(true);
   const [boardsError, setBoardsError] = useState<string | null>(null);
-
-  const loadForumAvatar = useCallback(() => {
-    if (!publicKey || profileLoading || !isRegistered) {
-      setProfileAvatarUrl(null);
-      return;
-    }
-    void fetch(apiUrl(`/api/profile?wallet=${encodeURIComponent(publicKey)}`))
-      .then(async (r) => {
-        const d = await parseApiJson<{ avatar_url?: string | null }>(r);
-        if (!r.ok) return;
-        const u = d?.avatar_url;
-        setProfileAvatarUrl(typeof u === 'string' && u.startsWith('https://') ? u : null);
-      })
-      .catch(() => setProfileAvatarUrl(null));
-  }, [publicKey, isRegistered, profileLoading]);
-
-  useEffect(() => {
-    loadForumAvatar();
-  }, [loadForumAvatar]);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,12 +87,6 @@ const ForumPage = () => {
       cancelled = true;
     };
   }, [publicKey]);
-
-  useEffect(() => {
-    const onProfile = () => loadForumAvatar();
-    window.addEventListener(LIGDER_PROFILE_UPDATED_EVENT, onProfile);
-    return () => window.removeEventListener(LIGDER_PROFILE_UPDATED_EVENT, onProfile);
-  }, [loadForumAvatar]);
 
   useEffect(() => {
     const state = location.state as ForumLocationState | null;
@@ -275,7 +249,11 @@ const ForumPage = () => {
                     <img
                       src={profileAvatarUrl}
                       alt=""
-                      className="w-9 h-9 border border-gray-400 object-cover shrink-0 bg-gray-100"
+                      width={36}
+                      height={36}
+                      decoding="async"
+                      fetchPriority="high"
+                      className="h-9 w-9 border border-gray-400 object-cover shrink-0 bg-gray-100"
                     />
                   ) : null}
                   <span>

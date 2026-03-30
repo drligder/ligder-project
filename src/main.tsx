@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
+import { ForumAccountProvider } from './hooks/useForumAccount';
 import { ToastProvider } from './contexts/ToastContext.tsx';
 import { WalletProvider } from './contexts/WalletContext.tsx';
 import './index.css';
@@ -56,9 +57,11 @@ createRoot(el).render(
     <BrowserRouter>
       <WalletProvider>
         <ToastProvider>
-          <ErrorBoundary>
-            <App />
-          </ErrorBoundary>
+          <ForumAccountProvider>
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
+          </ForumAccountProvider>
         </ToastProvider>
       </WalletProvider>
     </BrowserRouter>
