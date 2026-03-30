@@ -207,10 +207,18 @@ const ForumPage = () => {
         </div>
 
         <h1
-          className="ligder-pixel-title text-center mb-4"
+          className="ligder-pixel-title mb-4 flex flex-wrap items-center justify-center gap-2 text-center"
           style={{ marginTop: 0, fontSize: 'clamp(1.5rem, 4vw, 2.25rem)' }}
         >
-          Ligder forums
+          <img
+            src="/icons/chat-48.png"
+            alt=""
+            width={40}
+            height={40}
+            className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+            decoding="async"
+          />
+          <span>Ligder forums</span>
         </h1>
 
         <div
@@ -219,14 +227,16 @@ const ForumPage = () => {
         >
           <Link
             to="/liteboard/deploy"
-            className="text-sm px-4 py-2 border border-gray-800 bg-white text-gray-900 hover:bg-gray-100 text-center no-underline inline-block"
+            className="inline-flex items-center gap-2 text-sm px-4 py-2 border border-gray-800 bg-white text-gray-900 hover:bg-gray-100 text-center no-underline"
           >
+            <img src="/icons/done-48.png" alt="" width={22} height={22} className="h-5 w-5 shrink-0 object-contain" decoding="async" />
             Deploy a Liteboard
           </Link>
           <Link
             to="/liteboard/explorer"
-            className="text-sm px-4 py-2 border border-gray-400 bg-white text-blue-800 hover:bg-gray-50 text-center no-underline inline-block"
+            className="inline-flex items-center gap-2 text-sm px-4 py-2 border border-gray-400 bg-white text-blue-800 hover:bg-gray-50 text-center no-underline"
           >
+            <img src="/icons/evidence-48.png" alt="" width={22} height={22} className="h-5 w-5 shrink-0 object-contain" decoding="async" />
             Liteboard Explorer
           </Link>
         </div>

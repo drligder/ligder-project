@@ -1,9 +1,8 @@
 /**
- * Icon before board titles — official boards use megaphone, all others use chat.
+ * Icon before board titles — official (megaphone) uses vector icon; all others use topic asset.
  */
 export function ForumBoardIcon({ iconKey }: { iconKey: string }) {
-  const cls =
-    'inline-flex shrink-0 text-gray-800 mr-2 align-middle [&_svg]:w-[1.1em] [&_svg]:h-[1.1em] [&_svg]:translate-y-px';
+  const cls = 'inline-flex shrink-0 mr-2 align-middle [&_svg]:w-[1.1em] [&_svg]:h-[1.1em] [&_svg]:translate-y-px text-gray-800';
   if (iconKey === 'megaphone') {
     return (
       <span className={cls} aria-hidden>
@@ -14,10 +13,15 @@ export function ForumBoardIcon({ iconKey }: { iconKey: string }) {
     );
   }
   return (
-    <span className={cls} aria-hidden>
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" />
-      </svg>
+    <span className={`${cls} [&_img]:translate-y-px`} aria-hidden>
+      <img
+        src="/icons/topic-48.png"
+        alt=""
+        width={20}
+        height={20}
+        className="h-5 w-5 object-contain"
+        decoding="async"
+      />
     </span>
   );
 }

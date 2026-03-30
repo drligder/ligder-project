@@ -460,10 +460,18 @@ const DividendsPage = () => {
             />
           </div>
           <h1
-            className="ligder-pixel-title text-center mb-3"
+            className="ligder-pixel-title mb-3 flex flex-wrap items-center justify-center gap-2 text-center"
             style={{ marginTop: 0, fontSize: 'clamp(1.5rem, 4vw, 2.25rem)' }}
           >
-            Dividend claims
+            <img
+              src="/icons/stack-of-money-48.png"
+              alt=""
+              width={40}
+              height={40}
+              className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+              decoding="async"
+            />
+            <span>Dividend claims</span>
           </h1>
 
           <p className="text-sm text-gray-700 mb-0 leading-relaxed" style={{ fontFamily: 'Times New Roman, serif' }}>
@@ -513,15 +521,33 @@ const DividendsPage = () => {
           </div>
 
           <div className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs text-gray-600 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
-                  Current fee pool (latest finalized snapshot)
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <img
+                    src="/icons/treasure-chest-48.png"
+                    alt=""
+                    width={40}
+                    height={40}
+                    className="h-9 w-9 shrink-0 object-contain sm:h-10 sm:w-10"
+                    decoding="async"
+                  />
+                  <div>
+                    <div
+                      className="text-base font-bold text-gray-900 sm:text-lg"
+                      style={{ fontFamily: 'Arial, sans-serif' }}
+                    >
+                      Current fee pool
+                    </div>
+                    <div className="text-xs text-gray-600" style={{ fontFamily: 'Arial, sans-serif' }}>
+                      Latest finalized snapshot (claimable pot)
+                    </div>
+                  </div>
                 </div>
-                <div className="text-sm font-mono">
+                <div className="font-mono text-2xl font-semibold tabular-nums text-gray-900 sm:text-3xl">
                   {status?.claimable_pot_raw ? `${formatRawLite(status.claimable_pot_raw)} LITE` : '0 LITE'}
                 </div>
-                <div className="mt-2 text-xs text-gray-700">
+                <div className="mt-3 text-xs text-gray-700 sm:text-sm">
                   <div>
                     Deposits: <span className="font-mono">{status?.deposit_total_raw ? `${formatRawLite(status.deposit_total_raw)}` : '—'} LITE</span>
                   </div>
@@ -545,14 +571,22 @@ const DividendsPage = () => {
                 ) : null}
               </div>
 
-              <div className="flex items-center gap-2 self-start sm:self-center">
+              <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
                 <button
                   type="button"
-                  className="min-w-[7.5rem] px-6 py-3 text-base font-semibold rounded-md border border-gray-900 bg-gray-900 text-white shadow-sm hover:bg-gray-800 hover:border-gray-800 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:bg-gray-900"
+                  className="inline-flex min-w-[7.5rem] items-center justify-center gap-2 rounded-md border border-gray-800 bg-green-700 px-6 py-3 text-base font-semibold text-white shadow-sm transition hover:bg-green-800 hover:border-gray-900 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 disabled:hover:bg-green-700"
                   disabled={!publicKey || statusLoading || !status?.myEntitlement || !status.isEligible}
                   onClick={() => void handleClaim()}
                   style={{ fontFamily: 'Arial, sans-serif' }}
                 >
+                  <img
+                    src="/icons/done-48.png"
+                    alt=""
+                    width={22}
+                    height={22}
+                    className="h-5 w-5 shrink-0 object-contain drop-shadow-sm"
+                    decoding="async"
+                  />
                   Claim
                 </button>
               </div>

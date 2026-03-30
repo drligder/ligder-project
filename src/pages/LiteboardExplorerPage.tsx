@@ -204,17 +204,33 @@ const LiteboardExplorerPage = () => {
                       >
                         {label ? (
                           <div
-                            className="text-lg font-bold text-slate-900 mb-1 leading-tight"
+                            className="mb-1 flex items-center gap-2 text-lg font-bold leading-tight text-slate-900"
                             style={{ fontFamily: 'Arial, sans-serif' }}
                           >
-                            {label}
+                            <img
+                              src="/icons/check-mark-48.png"
+                              alt=""
+                              width={28}
+                              height={28}
+                              className="h-7 w-7 shrink-0 object-contain"
+                              decoding="async"
+                            />
+                            <span className="min-w-0">{label}</span>
                           </div>
                         ) : (
                           <div
-                            className="text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wide"
+                            className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500"
                             style={{ fontFamily: 'Arial, sans-serif' }}
                           >
-                            Liteboard
+                            <img
+                              src="/icons/check-mark-48.png"
+                              alt=""
+                              width={28}
+                              height={28}
+                              className="h-7 w-7 shrink-0 object-contain"
+                              decoding="async"
+                            />
+                            <span>Liteboard</span>
                           </div>
                         )}
                         <div className="text-blue-800 font-mono text-xs sm:text-sm break-all underline hover:text-blue-950 decoration-blue-800/80">

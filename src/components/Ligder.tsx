@@ -58,16 +58,26 @@ const Ligder = () => {
         Just holders and a forum.
       </p>
 
-      <p className="academic-text !mb-0 pb-12 md:pb-16">
-        Want to read more?{' '}
-        <a
-          href="/Papers/ligder-gazette.html"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-700 hover:text-blue-900 underline"
-        >
-          Read our Ligder Gazette
-        </a>
+      <p className="academic-text !mb-0 flex flex-wrap items-start gap-2 pb-12 md:pb-16">
+        <img
+          src="/icons/snowball-48.png"
+          alt=""
+          width={28}
+          height={28}
+          className="mt-0.5 h-7 w-7 shrink-0 object-contain"
+          decoding="async"
+        />
+        <span>
+          Want to read more?{' '}
+          <a
+            href="/Papers/ligder-gazette.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-700 hover:text-blue-900 underline"
+          >
+            Read our Ligder Gazette
+          </a>
+        </span>
       </p>
 
       <h2 className="section-header mt-0">Create your project&apos;s Liteboard</h2>

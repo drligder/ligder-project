@@ -28,10 +28,18 @@ const ForDevelopersPage = () => {
             />
           </div>
           <h1
-            className="ligder-pixel-title text-center mb-4"
+            className="ligder-pixel-title mb-4 flex flex-wrap items-center justify-center gap-2 text-center"
             style={{ marginTop: 0, fontSize: 'clamp(1.5rem, 4vw, 2.25rem)' }}
           >
-            For developers
+            <img
+              src="/icons/futurama-bender-48.png"
+              alt=""
+              width={40}
+              height={40}
+              className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+              decoding="async"
+            />
+            <span>For developers</span>
           </h1>
           <p className="text-sm text-gray-700 mb-4" style={{ fontFamily: 'Times New Roman, serif' }}>
             Ligder is a wallet-native forum system designed for transparent governance and easy self-hosting.
@@ -43,16 +51,18 @@ const ForDevelopersPage = () => {
               href={REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block text-sm px-4 py-2 border border-gray-700 bg-white text-blue-700 hover:text-blue-900 hover:bg-gray-100"
+              className="inline-flex items-center gap-2 text-sm px-4 py-2 border border-gray-700 bg-white text-blue-700 hover:text-blue-900 hover:bg-gray-100"
               style={{ fontFamily: 'Arial, sans-serif' }}
             >
+              <img src="/icons/done-48.png" alt="" width={22} height={22} className="h-5 w-5 shrink-0 object-contain" decoding="async" />
               Visit repo
             </a>
             <Link
               to="/forums/archive"
-              className="inline-block text-sm px-4 py-2 border border-gray-700 bg-white text-blue-700 hover:text-blue-900 hover:bg-gray-100"
+              className="inline-flex items-center gap-2 text-sm px-4 py-2 border border-gray-700 bg-white text-blue-700 hover:text-blue-900 hover:bg-gray-100"
               style={{ fontFamily: 'Arial, sans-serif' }}
             >
+              <img src="/icons/evidence-48.png" alt="" width={22} height={22} className="h-5 w-5 shrink-0 object-contain" decoding="async" />
               View archive & verify
             </Link>
           </div>

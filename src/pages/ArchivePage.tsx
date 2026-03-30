@@ -170,10 +170,18 @@ const ArchivePage = () => {
         </div>
 
         <h1
-          className="ligder-pixel-title text-center mb-4"
+          className="ligder-pixel-title mb-4 flex flex-wrap items-center justify-center gap-2 text-center"
           style={{ marginTop: 0, fontSize: 'clamp(1.5rem, 4vw, 2.25rem)' }}
         >
-          Archive &amp; verify
+          <img
+            src="/icons/evidence-48.png"
+            alt=""
+            width={40}
+            height={40}
+            className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
+            decoding="async"
+          />
+          <span>Archive &amp; verify</span>
         </h1>
         <p className="text-sm text-gray-700 mb-4" style={{ fontFamily: 'Times New Roman, serif' }}>
           Browse relayed on-chain attestations in Archive, or switch to Verify Attestation to decode a specific
