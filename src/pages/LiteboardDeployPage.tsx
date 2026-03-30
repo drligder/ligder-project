@@ -180,10 +180,18 @@ const LiteboardDeployPage = () => {
           />
           <button
             type="button"
-            className="text-sm px-3 py-2 border border-gray-800 bg-white disabled:opacity-50"
+            className="inline-flex items-center gap-2 text-sm px-3 py-2 border border-gray-800 bg-white disabled:opacity-50"
             disabled={busy || createBusy}
             onClick={() => void runVerify()}
           >
+            <img
+              src="/icons/done-48.png"
+              alt=""
+              width={22}
+              height={22}
+              className="h-5 w-5 shrink-0 object-contain"
+              decoding="async"
+            />
             {busy ? 'Signing…' : 'Verify mint'}
           </button>
 
