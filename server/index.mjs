@@ -182,6 +182,31 @@ function dividendsPeriodStartEndFromId(periodIdBigint) {
   return { start, end };
 }
 
+/** Sum recorded admin deposits for the current (open) 6h bucket — UI accrual before finalization. */
+async function dividendOpenPeriodAccrualPayload() {
+  const periodId = dividendsPeriodIdForNowMs(Date.now());
+  const periodIdStr = periodId.toString();
+  const { end } = dividendsPeriodStartEndFromId(periodId);
+  const { data: rows, error } = await supabase
+    .from('dividend_deposits')
+    .select('amount_raw')
+    .eq('deposit_period_id', periodIdStr);
+  if (error) throw error;
+  let total = 0n;
+  for (const r of rows ?? []) {
+    if (r?.amount_raw != null) total += BigInt(String(r.amount_raw));
+  }
+  const claimablePot = (total * 75n) / 100n;
+  const managementReserve = total - claimablePot;
+  return {
+    open_period_id: periodIdStr,
+    open_period_end_unix: Number(end),
+    open_period_deposit_total_raw: total.toString(),
+    open_period_claimable_pot_raw: claimablePot.toString(),
+    open_period_management_reserve_raw: managementReserve.toString(),
+  };
+}
+
 function rawToLiteTokenFloatDisplay(rawBigInt) {
   // Only used for UI display text; keep precision reasonable.
   const raw = BigInt(rawBigInt);
@@ -3093,23 +3118,39 @@ app.get('/api/dividends/clock', (_req, res) => {
   res.json({ server_now_unix: Math.floor(Date.now() / 1000) });
 });
 
-// Read dividends status for a wallet (must be registered to claim; unregistered gets zero/empty entitlement).
+// Dividends status: pool + open-period accrual is public; `wallet` optional (required path for claim eligibility).
 app.get('/api/dividends/status', async (req, res) => {
   const treasuryWalletPublic = dividendsTreasuryKeypair
     ? dividendsTreasuryKeypair.publicKey.toBase58()
     : null;
 
   const walletRaw = String(req.query.wallet ?? '').trim();
-  if (!walletRaw) {
-    return res.status(400).json({ error: 'Missing wallet' });
+  let walletOk = null;
+  if (walletRaw) {
+    try {
+      walletOk = new PublicKey(walletRaw).toBase58();
+    } catch {
+      return res.status(400).json({ error: 'Invalid wallet' });
+    }
   }
-  let walletOk;
-  try {
-    walletOk = new PublicKey(walletRaw).toBase58();
-  } catch {
-    return res.status(400).json({ error: 'Invalid wallet' });
-  }
+
   if (!LITE_TOKEN_MINT) return res.json({ error: 'LITE_TOKEN_MINT not configured' });
+
+  let openAcc;
+  try {
+    openAcc = await dividendOpenPeriodAccrualPayload();
+  } catch (e) {
+    console.error('[dividends] open period accrual failed', e);
+    const pid = dividendsPeriodIdForNowMs(Date.now());
+    const { end } = dividendsPeriodStartEndFromId(pid);
+    openAcc = {
+      open_period_id: pid.toString(),
+      open_period_end_unix: Number(end),
+      open_period_deposit_total_raw: '0',
+      open_period_claimable_pot_raw: '0',
+      open_period_management_reserve_raw: '0',
+    };
+  }
 
   // Latest finalized period.
   const { data: latest, error: latestErr } = await supabase
@@ -3122,8 +3163,12 @@ app.get('/api/dividends/status', async (req, res) => {
     .limit(1)
     .maybeSingle();
   if (latestErr) return res.status(500).json({ error: latestErr.message });
+
+  const nowUnix = Math.floor(Date.now() / 1000);
+
   if (!latest) {
     return res.json({
+      ...openAcc,
       latestPeriod: null,
       claimable_pot_raw: '0',
       management_reserve_raw: '0',
@@ -3134,16 +3179,41 @@ app.get('/api/dividends/status', async (req, res) => {
       myClaimed: false,
       isEligible: false,
       treasury_wallet: treasuryWalletPublic,
+      server_now_unix: nowUnix,
     });
   }
 
   const periodId = BigInt(latest.period_id);
   const periodEndUnix = Number(latest.period_end_unix);
-  const nowUnix = Math.floor(Date.now() / 1000);
   const claimDeadlineUnix = periodEndUnix + DIVIDENDS_PERIOD_SECONDS; // next snapshot boundary
   const withinWindow = nowUnix <= claimDeadlineUnix;
   const snapshotTakenUnix = periodEndUnix;
   const nextSnapshotUnix = claimDeadlineUnix;
+
+  const finalizedBase = {
+    ...openAcc,
+    latestPeriod: latest.period_id,
+    claimable_pot_raw: latest.claimable_pot_raw,
+    management_reserve_raw: latest.management_reserve_raw,
+    deposit_total_raw: latest.deposit_total_raw,
+    snapshot_total_balance_raw: latest.snapshot_total_balance_raw,
+    snapshot_taken_at: latest.snapshot_taken_at,
+    withinWindow,
+    server_now_unix: nowUnix,
+    snapshot_taken_unix: snapshotTakenUnix,
+    next_snapshot_unix: nextSnapshotUnix,
+    claim_window_end_unix: claimDeadlineUnix,
+    treasury_wallet: treasuryWalletPublic,
+  };
+
+  if (!walletOk) {
+    return res.json({
+      ...finalizedBase,
+      myEntitlement: null,
+      myClaimed: false,
+      isEligible: false,
+    });
+  }
 
   const { data: prof } = await supabase
     .from('profiles')
@@ -3153,21 +3223,10 @@ app.get('/api/dividends/status', async (req, res) => {
   const isRegistered = Boolean(prof);
   if (!isRegistered) {
     return res.json({
-      latestPeriod: latest.period_id,
-      claimable_pot_raw: latest.claimable_pot_raw,
-      management_reserve_raw: latest.management_reserve_raw,
-      deposit_total_raw: latest.deposit_total_raw,
-      snapshot_total_balance_raw: latest.snapshot_total_balance_raw,
-      snapshot_taken_at: latest.snapshot_taken_at,
+      ...finalizedBase,
       myEntitlement: null,
       myClaimed: false,
       isEligible: false,
-      withinWindow,
-      server_now_unix: nowUnix,
-      snapshot_taken_unix: snapshotTakenUnix,
-      next_snapshot_unix: nextSnapshotUnix,
-      claim_window_end_unix: claimDeadlineUnix,
-      treasury_wallet: treasuryWalletPublic,
     });
   }
 
@@ -3182,21 +3241,10 @@ app.get('/api/dividends/status', async (req, res) => {
 
   if (!ent) {
     return res.json({
-      latestPeriod: latest.period_id,
-      claimable_pot_raw: latest.claimable_pot_raw,
-      management_reserve_raw: latest.management_reserve_raw,
-      deposit_total_raw: latest.deposit_total_raw,
-      snapshot_total_balance_raw: latest.snapshot_total_balance_raw,
-      snapshot_taken_at: latest.snapshot_taken_at,
+      ...finalizedBase,
       myEntitlement: null,
       myClaimed: false,
       isEligible: false,
-      withinWindow,
-      server_now_unix: nowUnix,
-      snapshot_taken_unix: snapshotTakenUnix,
-      next_snapshot_unix: nextSnapshotUnix,
-      claim_window_end_unix: claimDeadlineUnix,
-      treasury_wallet: treasuryWalletPublic,
     });
   }
 
@@ -3213,25 +3261,14 @@ app.get('/api/dividends/status', async (req, res) => {
       : false;
 
   return res.json({
-    latestPeriod: latest.period_id,
-    claimable_pot_raw: latest.claimable_pot_raw,
-    management_reserve_raw: latest.management_reserve_raw,
-    deposit_total_raw: latest.deposit_total_raw,
-    snapshot_total_balance_raw: latest.snapshot_total_balance_raw,
-    snapshot_taken_at: latest.snapshot_taken_at,
+    ...finalizedBase,
     myEntitlement: {
       balance_snapshot_raw: ent.balance_snapshot_raw,
       entitlement_raw: ent.entitlement_raw,
     },
     myClaimed,
     isEligible: withinWindow && !myClaimed && eligibleByTolerance && entitlementRaw > 0n,
-    withinWindow,
     current_balance_raw: currentBalRaw.toString(),
-    server_now_unix: nowUnix,
-    snapshot_taken_unix: snapshotTakenUnix,
-    next_snapshot_unix: nextSnapshotUnix,
-    claim_window_end_unix: claimDeadlineUnix,
-    treasury_wallet: treasuryWalletPublic,
   });
 });
 

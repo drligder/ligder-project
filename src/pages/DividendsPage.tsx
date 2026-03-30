@@ -16,6 +16,12 @@ type DividendStatusResponse = {
   deposit_total_raw: string;
   snapshot_total_balance_raw: string;
   snapshot_taken_at: string | null;
+  /** Current 6h bucket: sum of admin-recorded deposits (before finalization). */
+  open_period_id: string;
+  open_period_end_unix: number;
+  open_period_deposit_total_raw: string;
+  open_period_claimable_pot_raw: string;
+  open_period_management_reserve_raw: string;
   myEntitlement: null | {
     balance_snapshot_raw: string;
     entitlement_raw: string;
@@ -196,18 +202,16 @@ const DividendsPage = () => {
   }, []);
 
   const loadStatus = useCallback(async () => {
-    if (!publicKey) {
-      setStatus(null);
-      setStatusLoading(false);
-      setStatusError(null);
-      return;
-    }
     setStatusLoading(true);
     setStatusError(null);
     try {
-      const r = await fetch(apiUrl(`/api/dividends/status?wallet=${encodeURIComponent(publicKey)}`));
+      const qs = publicKey
+        ? `wallet=${encodeURIComponent(publicKey)}`
+        : '';
+      const r = await fetch(apiUrl(`/api/dividends/status${qs ? `?${qs}` : ''}`));
       const j = await parseApiJson<DividendStatusResponse>(r);
       if (!r.ok) throw new Error(j.error || `Failed (${r.status})`);
+      if (j.error) throw new Error(j.error);
       setStatus(j);
       if (typeof j?.server_now_unix === 'number') {
         setServerNowUnix(j.server_now_unix);
@@ -540,10 +544,10 @@ const DividendsPage = () => {
                       className="text-base font-bold text-gray-900 sm:text-lg"
                       style={{ fontFamily: 'Arial, sans-serif' }}
                     >
-                      Current fee pool
+                      Accruing this period
                     </div>
                     <div className="text-xs text-gray-600" style={{ fontFamily: 'Arial, sans-serif' }}>
-                      Latest finalized snapshot (claimable pot)
+                      LITE recorded via admin deposit tx (current 6h window — not yet finalized)
                     </div>
                     {status?.treasury_wallet ? (
                       <div
@@ -583,30 +587,91 @@ const DividendsPage = () => {
                   </div>
                 </div>
                 <div className="font-mono text-2xl font-semibold tabular-nums text-gray-900 sm:text-3xl">
-                  {status?.claimable_pot_raw ? `${formatRawLite(status.claimable_pot_raw)} LITE` : '0 LITE'}
+                  {status?.open_period_deposit_total_raw != null
+                    ? `${formatRawLite(status.open_period_deposit_total_raw)} LITE`
+                    : '—'}
                 </div>
-                <div className="mt-3 text-xs text-gray-700 sm:text-sm">
+                <div className="mt-3 text-xs text-gray-700 sm:text-sm space-y-0.5">
                   <div>
-                    Deposits: <span className="font-mono">{status?.deposit_total_raw ? `${formatRawLite(status.deposit_total_raw)}` : '—'} LITE</span>
-                  </div>
-                  <div>
-                    Claimable (75%):{' '}
+                    Deposits (raw):{' '}
                     <span className="font-mono">
-                      {status?.claimable_pot_raw ? `${formatRawLite(status.claimable_pot_raw)}` : '—'} LITE
+                      {status?.open_period_deposit_total_raw != null
+                        ? `${formatRawLite(status.open_period_deposit_total_raw)}`
+                        : '—'}{' '}
+                      LITE
                     </span>
                   </div>
                   <div>
-                    Management reserve (25%):{' '}
+                    Claimable preview (75%):{' '}
                     <span className="font-mono">
-                      {status?.management_reserve_raw ? `${formatRawLite(status.management_reserve_raw)}` : '—'} LITE
+                      {status?.open_period_claimable_pot_raw != null
+                        ? `${formatRawLite(status.open_period_claimable_pot_raw)}`
+                        : '—'}{' '}
+                      LITE
                     </span>
                   </div>
-                </div>
-                {typeof status?.snapshot_taken_at === 'string' ? (
-                  <div className="mt-2 text-xs text-gray-600">
-                    Snapshot taken: <span className="font-mono">{new Date(status.snapshot_taken_at).toLocaleString()}</span>
+                  <div>
+                    Management preview (25%):{' '}
+                    <span className="font-mono">
+                      {status?.open_period_management_reserve_raw != null
+                        ? `${formatRawLite(status.open_period_management_reserve_raw)}`
+                        : '—'}{' '}
+                      LITE
+                    </span>
                   </div>
-                ) : null}
+                  {typeof status?.open_period_end_unix === 'number' ? (
+                    <div className="text-gray-600 pt-1">
+                      Window ends (UTC):{' '}
+                      <span className="font-mono">
+                        {new Date(status.open_period_end_unix * 1000).toISOString().replace('T', ' ').slice(0, 19)}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-6 pt-5 border-t border-gray-200">
+                  <div
+                    className="text-sm font-bold text-gray-900 mb-0.5"
+                    style={{ fontFamily: 'Arial, sans-serif' }}
+                  >
+                    Last finalized period
+                  </div>
+                  <div className="text-xs text-gray-600 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    Claimable pot from the latest snapshot (used for claims)
+                  </div>
+                  <div className="font-mono text-xl font-semibold tabular-nums text-gray-900 sm:text-2xl">
+                    {status?.claimable_pot_raw != null
+                      ? `${formatRawLite(status.claimable_pot_raw)} LITE`
+                      : '0 LITE'}
+                  </div>
+                  <div className="mt-2 text-xs text-gray-700 sm:text-sm space-y-0.5">
+                    <div>
+                      Deposits:{' '}
+                      <span className="font-mono">
+                        {status?.deposit_total_raw != null ? `${formatRawLite(status.deposit_total_raw)}` : '—'} LITE
+                      </span>
+                    </div>
+                    <div>
+                      Claimable (75%):{' '}
+                      <span className="font-mono">
+                        {status?.claimable_pot_raw != null ? `${formatRawLite(status.claimable_pot_raw)}` : '—'} LITE
+                      </span>
+                    </div>
+                    <div>
+                      Management reserve (25%):{' '}
+                      <span className="font-mono">
+                        {status?.management_reserve_raw != null ? `${formatRawLite(status.management_reserve_raw)}` : '—'}{' '}
+                        LITE
+                      </span>
+                    </div>
+                  </div>
+                  {typeof status?.snapshot_taken_at === 'string' ? (
+                    <div className="mt-2 text-xs text-gray-600">
+                      Snapshot taken:{' '}
+                      <span className="font-mono">{new Date(status.snapshot_taken_at).toLocaleString()}</span>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <div className="flex shrink-0 items-center gap-2 self-start sm:self-center">
