@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { formatLiteHoldings } from '../../lib/formatLite';
+import { formatLiteHoldingsSidebar } from '../../lib/formatLite';
 import { solscanAccountUrl, solscanTxUrl, truncateWalletDisplay } from '../../lib/solscan';
 import type { AuthorForumSidebarStats, ForumMemberRank, ForumThreadPost } from '../../types/forum';
 import type { PostVoteAction, PostVoteSnapshot } from '../../types/forumVotes';
@@ -55,12 +55,21 @@ function XIcon({ className }: { className?: string }) {
   );
 }
 
-function SidebarStatRow({ label, value }: { label: string; value: ReactNode }) {
+function SidebarStatRow({
+  label,
+  value,
+  title,
+}: {
+  label: string;
+  value: ReactNode;
+  title?: string;
+}) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_8rem] w-full border-b border-gray-400 last:border-b-0">
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(5.5rem,1fr)] w-full border-b border-gray-400 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_8rem]">
       <div
         className="min-w-0 border-r border-gray-400 bg-gray-100 px-1.5 py-1 text-left font-semibold text-gray-800"
         style={{ fontFamily: 'Arial, sans-serif' }}
+        title={title}
       >
         {label}
       </div>
@@ -143,8 +152,12 @@ export function ThreadPost({
   onThreadPollsRefresh,
 }: ThreadPostProps) {
   const stripe = index1Based % 2 === 1 ? 'bg-white' : 'bg-gray-50';
-  const liteLabel = formatLiteHoldings(post.liteHoldingsUi ?? null);
   const rankTheme = RANK_THEME[post.rank];
+
+  const liteLabel = useMemo(
+    () => formatLiteHoldingsSidebar(post.liteHoldingsUi ?? null),
+    [post.liteHoldingsUi]
+  );
 
   const repVal = statsLoading
     ? '…'
@@ -152,6 +165,12 @@ export function ThreadPost({
   const likesVal = statsLoading
     ? '…'
     : formatStatInt(authorStats?.likesOnPosts ?? null);
+  const postsTotal = useMemo(() => {
+    if (!authorStats) return null;
+    if (authorStats.postsCount == null && authorStats.threadsStarted == null) return null;
+    return (authorStats.postsCount ?? 0) + (authorStats.threadsStarted ?? 0);
+  }, [authorStats]);
+  const postsVal = statsLoading ? '…' : postsTotal == null ? '—' : formatStatInt(postsTotal);
   const xHandle = post.socials?.x ? post.socials.x.trim().replace(/^@/, '') : '';
   const githubHandle = post.socials?.github
     ? post.socials.github.trim().replace(/^@/, '')
@@ -254,9 +273,26 @@ export function ThreadPost({
           title="Profile stats (forum-wide)"
         >
           <SidebarStatRow label="Register Wallet" value={walletDisplay} />
-          <SidebarStatRow label="$LITE Holdings" value={liteLabel} />
+          <SidebarStatRow
+            label="$LITE Holdings"
+            value={
+              liteLabel ? (
+                <>
+                  {liteLabel.compact}
+                  <span className="text-green-800"> ({liteLabel.pctLabel})</span>
+                </>
+              ) : (
+                '—'
+              )
+            }
+          />
           <SidebarStatRow label="Reputation" value={repVal} />
           <SidebarStatRow label="Likes" value={likesVal} />
+          <SidebarStatRow
+            label="Posts"
+            title="Replies plus threads started (each thread OP counts as one)"
+            value={postsVal}
+          />
           <SidebarStatRow label="Socials" value={socialsVal} />
         </div>
       </div>
