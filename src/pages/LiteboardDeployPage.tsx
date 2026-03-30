@@ -143,6 +143,15 @@ const LiteboardDeployPage = () => {
           </div>
         </div>
 
+        <div className="mb-5 flex justify-center border border-gray-300 bg-gray-50 p-2">
+          <img
+            src="/images/fig035-01.gif"
+            alt=""
+            className="max-w-full h-auto w-full max-h-48 object-contain"
+            decoding="async"
+          />
+        </div>
+
         <h1 className="ligder-pixel-title text-xl text-gray-900 mb-2">
           Deploy a Liteboard
         </h1>
