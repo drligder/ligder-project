@@ -69,6 +69,10 @@ export type AuthorForumSidebarStats = {
   reputation: number | null;
   likesOnPosts: number | null;
   dislikesOnPosts: number | null;
+  /** Reply/non-OP posts (profile counter) */
+  postsCount: number | null;
+  /** Threads started (OP); add to postsCount for “total posts” in sidebar */
+  threadsStarted: number | null;
 };
 
 export type ForumThreadPost = {
