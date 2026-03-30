@@ -207,18 +207,10 @@ const ForumPage = () => {
         </div>
 
         <h1
-          className="ligder-pixel-title mb-4 flex flex-wrap items-center justify-center gap-2 text-center"
+          className="ligder-pixel-title text-center mb-4"
           style={{ marginTop: 0, fontSize: 'clamp(1.5rem, 4vw, 2.25rem)' }}
         >
-          <img
-            src="/icons/chat-48.png"
-            alt=""
-            width={40}
-            height={40}
-            className="h-8 w-8 shrink-0 object-contain sm:h-9 sm:w-9"
-            decoding="async"
-          />
-          <span>Ligder forums</span>
+          Ligder forums
         </h1>
 
         <div
