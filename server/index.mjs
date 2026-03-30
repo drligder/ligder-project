@@ -4323,6 +4323,8 @@ app.get('/api/reputation/by-usernames', async (req, res) => {
       breakdown: r.breakdown,
       likes: t.likes,
       dislikes: t.dislikes,
+      posts_count: Number(p.posts_count) || 0,
+      threads_started: Number(p.threads_started) || 0,
     };
   }
 
