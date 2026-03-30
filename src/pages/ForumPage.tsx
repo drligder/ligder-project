@@ -202,7 +202,7 @@ const ForumPage = () => {
           onClose={() => setWelcomeModalOpen(false)}
         />
       ) : null}
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      <div className="max-w-5xl mx-auto px-4 py-5 sm:px-6 sm:py-6">
         <div
           className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm"
           style={{ fontFamily: 'Arial, sans-serif' }}
@@ -264,10 +264,10 @@ const ForumPage = () => {
         </p>
 
         <div
-          className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-gray-400 bg-gray-50 px-3 py-2.5 text-sm text-gray-800"
+          className="mb-6 flex flex-col gap-3 border border-gray-400 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
           style={{ fontFamily: 'Times New Roman, serif' }}
         >
-          <p className="m-0 flex flex-wrap items-baseline gap-x-1 gap-y-0">
+          <p className="m-0 min-w-0 flex flex-wrap items-baseline gap-x-1 gap-y-0">
             {publicKey && username ? (
               <>
                 <span className="inline-flex flex-wrap items-center gap-2">
@@ -319,7 +319,7 @@ const ForumPage = () => {
             )}
           </p>
           <div
-            className="shrink-0 text-right"
+            className="shrink-0 border-t border-gray-200 pt-2 text-left sm:border-t-0 sm:pt-0 sm:text-right"
             style={{ fontFamily: 'Arial, sans-serif' }}
           >
             <div className="text-[0.65rem] uppercase tracking-wide text-gray-500 mb-0.5">
