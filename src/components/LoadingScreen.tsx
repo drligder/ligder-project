@@ -21,66 +21,83 @@ const LoadingScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 bg-gray-100 flex items-center justify-center z-50 px-8">
-      <div className="text-center max-w-4xl w-full">
-        <div
-          className="relative w-full h-64 bg-cover bg-center bg-black flex items-center justify-center mb-8 border-2 border-gray-400 shadow-lg"
-          style={{
-            backgroundImage: 'url(/images/BackgroundLoading.png)',
-            filter: 'grayscale(100%) brightness(90%) contrast(120%)',
-          }}
-        >
-          <div className="absolute inset-0 bg-gray-900 bg-opacity-50"></div>
+    <div className="fixed inset-0 z-50 min-h-dvh overflow-y-auto overscroll-y-contain bg-gray-100">
+      <div className="flex min-h-dvh flex-col justify-center px-4 py-8 sm:px-8 sm:py-10">
+        <div className="mx-auto w-full max-w-4xl text-center">
+          <div
+            className="relative mb-6 flex min-h-[10rem] w-full items-center justify-center border-2 border-gray-400 bg-black bg-cover bg-center shadow-lg sm:mb-8 sm:min-h-[16rem]"
+            style={{
+              backgroundImage: 'url(/images/BackgroundLoading.png)',
+              filter: 'grayscale(100%) brightness(90%) contrast(120%)',
+            }}
+          >
+            <div className="absolute inset-0 bg-gray-900/50" />
 
-          <div className="relative z-10 text-center">
-            <div className="mb-4">
-              <img
-                src="/images/NEWPROFILE.png"
-                alt=""
-                className="w-24 h-24 mx-auto border-2 border-white object-cover"
-                style={{ filter: 'grayscale(100%) brightness(110%) contrast(90%)' }}
+            <div className="relative z-10 px-3 text-center">
+              <div className="mb-3 sm:mb-4">
+                <img
+                  src="/images/NEWPROFILE.png"
+                  alt=""
+                  className="mx-auto h-20 w-20 border-2 border-white object-cover sm:h-24 sm:w-24"
+                  style={{ filter: 'grayscale(100%) brightness(110%) contrast(90%)' }}
+                />
+              </div>
+
+              <h1
+                className="ligder-pixel-title mb-1 text-gray-100 sm:mb-2"
+                style={{
+                  fontSize: 'clamp(1.75rem, 7vw, 2.75rem)',
+                  lineHeight: 1.15,
+                  letterSpacing: '0.04em',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.85)',
+                }}
+              >
+                Ligder
+              </h1>
+            </div>
+          </div>
+
+          <div
+            className="mx-auto mb-6 max-w-2xl border-2 border-gray-400 bg-white p-4 shadow-lg sm:mb-8 sm:p-6"
+            style={{ fontFamily: 'Times New Roman, serif' }}
+          >
+            <p className="mb-4 text-sm leading-relaxed text-gray-800 sm:mb-6 sm:text-base">
+              A live Solana forum: connect with Phantom, register a username, and post on the
+              forums. Thread and reply bodies live in the database; where attestations are enabled,
+              commitments are relayed on-chain so you can match posts to Memos. Profiles show your
+              LITE balance beside your name—weight that scales with skin in the game.
+            </p>
+            <p className="text-sm leading-relaxed text-gray-800 sm:text-base">
+              Voting, moderation tiers, Archive &amp; Verify, and the full stack in the repo—open,
+              readable, forkable.
+            </p>
+          </div>
+
+          <div className="mx-auto w-full max-w-md px-1">
+            <p
+              className="mb-2 text-center text-sm text-gray-800 sm:mb-3"
+              style={{ fontFamily: 'Arial, sans-serif' }}
+            >
+              Loading
+            </p>
+            <div
+              className="h-3 w-full overflow-hidden border border-gray-500 bg-gray-200 sm:h-3.5"
+              role="progressbar"
+              aria-valuenow={Math.round(progress)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className="h-full bg-gray-900 transition-[width] duration-100 ease-linear"
+                style={{ width: `${progress}%` }}
               />
             </div>
-
-            <h1 className="text-4xl font-bold text-gray-100 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
-              Ligder
-            </h1>
-          </div>
-        </div>
-
-        <div
-          className="mb-8 p-6 bg-white border-2 border-gray-400 shadow-lg max-w-2xl mx-auto"
-          style={{ fontFamily: 'Times New Roman, serif' }}
-        >
-          <p className="text-base text-gray-800 mb-6">
-            A live Solana forum: connect with Phantom, register a username, and post on the
-            forums. Thread and reply bodies live in the database; where attestations are enabled,
-            commitments are relayed on-chain so you can match posts to Memos. Profiles show your
-            LITE balance beside your name—weight that scales with skin in the game.
-          </p>
-          <p className="text-base text-gray-800">
-            Voting, moderation tiers, Archive &amp; Verify, and the full stack in the repo—open,
-            readable, forkable.
-          </p>
-        </div>
-
-        <div className="mb-6">
-          <div className="mb-4 text-center">
-            <span className="text-gray-700" style={{ fontFamily: 'Arial, sans-serif' }}>
-              Loading
-            </span>
-          </div>
-
-          <div className="w-80 mx-auto">
-            <div className="bg-gray-300 border border-gray-400 h-6 relative overflow-hidden">
-              <div
-                className="bg-black h-full transition-all duration-100 ease-linear"
-                style={{ width: `${progress}%` }}
-              ></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-mono text-white">{Math.round(progress)}%</span>
-              </div>
-            </div>
+            <p
+              className="mt-2 text-center text-base font-mono tabular-nums text-gray-900 sm:text-lg"
+              aria-live="polite"
+            >
+              {Math.round(progress)}%
+            </p>
           </div>
         </div>
       </div>
