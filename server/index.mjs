@@ -3079,6 +3079,10 @@ app.get('/api/dividends/clock', (_req, res) => {
 
 // Read dividends status for a wallet (must be registered to claim; unregistered gets zero/empty entitlement).
 app.get('/api/dividends/status', async (req, res) => {
+  const treasuryWalletPublic = dividendsTreasuryKeypair
+    ? dividendsTreasuryKeypair.publicKey.toBase58()
+    : null;
+
   const walletRaw = String(req.query.wallet ?? '').trim();
   if (!walletRaw) {
     return res.status(400).json({ error: 'Missing wallet' });
@@ -3113,6 +3117,7 @@ app.get('/api/dividends/status', async (req, res) => {
       myEntitlement: null,
       myClaimed: false,
       isEligible: false,
+      treasury_wallet: treasuryWalletPublic,
     });
   }
 
@@ -3146,6 +3151,7 @@ app.get('/api/dividends/status', async (req, res) => {
       snapshot_taken_unix: snapshotTakenUnix,
       next_snapshot_unix: nextSnapshotUnix,
       claim_window_end_unix: claimDeadlineUnix,
+      treasury_wallet: treasuryWalletPublic,
     });
   }
 
@@ -3174,6 +3180,7 @@ app.get('/api/dividends/status', async (req, res) => {
       snapshot_taken_unix: snapshotTakenUnix,
       next_snapshot_unix: nextSnapshotUnix,
       claim_window_end_unix: claimDeadlineUnix,
+      treasury_wallet: treasuryWalletPublic,
     });
   }
 
@@ -3208,6 +3215,7 @@ app.get('/api/dividends/status', async (req, res) => {
     snapshot_taken_unix: snapshotTakenUnix,
     next_snapshot_unix: nextSnapshotUnix,
     claim_window_end_unix: claimDeadlineUnix,
+    treasury_wallet: treasuryWalletPublic,
   });
 });
 

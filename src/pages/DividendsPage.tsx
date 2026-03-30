@@ -6,6 +6,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useLigderProfile } from '../hooks/useLigderProfile';
 import { apiUrl } from '../lib/apiBase';
 import { parseApiJson } from '../lib/parseApiJson';
+import { solscanAccountUrl, truncateWalletDisplay } from '../lib/solscan';
 import { uint8ToBase64 } from '../lib/uint8Base64';
 
 type DividendStatusResponse = {
@@ -27,6 +28,8 @@ type DividendStatusResponse = {
   snapshot_taken_unix?: number;
   next_snapshot_unix?: number;
   claim_window_end_unix?: number;
+  /** SPL dividend treasury (public); from server keypair when configured */
+  treasury_wallet?: string | null;
   error?: string;
 };
 
@@ -525,14 +528,14 @@ const DividendsPage = () => {
               <div className="min-w-0 flex-1">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <img
-                    src="/icons/treasure-chest-48.png"
+                    src="/icons/check-mark-48.png"
                     alt=""
                     width={40}
                     height={40}
                     className="h-9 w-9 shrink-0 object-contain sm:h-10 sm:w-10"
                     decoding="async"
                   />
-                  <div>
+                  <div className="min-w-0">
                     <div
                       className="text-base font-bold text-gray-900 sm:text-lg"
                       style={{ fontFamily: 'Arial, sans-serif' }}
@@ -542,6 +545,41 @@ const DividendsPage = () => {
                     <div className="text-xs text-gray-600" style={{ fontFamily: 'Arial, sans-serif' }}>
                       Latest finalized snapshot (claimable pot)
                     </div>
+                    {status?.treasury_wallet ? (
+                      <div
+                        className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-800"
+                        style={{ fontFamily: 'Arial, sans-serif' }}
+                      >
+                        <span className="text-gray-600 shrink-0">Treasury wallet</span>
+                        <span className="font-mono tabular-nums" title={status.treasury_wallet}>
+                          {truncateWalletDisplay(status.treasury_wallet, 4, 4)}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-blue-800 underline hover:text-blue-950 disabled:opacity-50"
+                          onClick={() => {
+                            void (async () => {
+                              try {
+                                await navigator.clipboard.writeText(status.treasury_wallet!);
+                                showToast('Address copied', 'success');
+                              } catch {
+                                showToast('Could not copy', 'error');
+                              }
+                            })();
+                          }}
+                        >
+                          Copy
+                        </button>
+                        <a
+                          href={solscanAccountUrl(status.treasury_wallet)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-800 underline hover:text-blue-950"
+                        >
+                          Solscan
+                        </a>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="font-mono text-2xl font-semibold tabular-nums text-gray-900 sm:text-3xl">
