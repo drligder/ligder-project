@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ligder Gazette — Governance, LITE &amp; the Forum</title>
+    <title>Ligder Gazette — Governance, LITE, Forums &amp; Liteboards</title>
     <style>
         @font-face {
             font-family: 'Mini Pixel 7';
@@ -62,12 +62,13 @@
             border-bottom: 1px solid #d1d5db;
         }
 
+        /* Mini Pixel 7 — ~2× prior sizes (was ~clamp 1.35–2rem, ~1.06rem h2) */
         .title-pixel {
             font-family: 'Mini Pixel 7', ui-monospace, monospace;
             font-weight: normal;
             letter-spacing: 0.04em;
-            font-size: clamp(1.35rem, 4vw, 2rem);
-            line-height: 1.2;
+            font-size: clamp(2.7rem, 8vw, 4rem);
+            line-height: 1.15;
             color: #111827;
             margin-bottom: 12px;
         }
@@ -107,9 +108,10 @@
 
         h2 {
             font-family: 'Mini Pixel 7', ui-monospace, monospace;
-            font-size: 1.0625rem;
+            font-size: 2.125rem;
             font-weight: normal;
             letter-spacing: 0.06em;
+            line-height: 1.2;
             margin-top: 2.25rem;
             margin-bottom: 1rem;
             color: #111827;
@@ -140,7 +142,7 @@
             background: #f9fafb;
             padding: 1.5rem 1.25rem;
             margin: 0 0 1.75rem;
-            border-left: 4px solid #1f2937;
+            border-left: 4px solid #374151;
             font-style: italic;
             color: #374151;
         }
@@ -152,11 +154,12 @@
             letter-spacing: 0.02em;
         }
 
+        /* Neutral “callout” — matches site grays, no amber */
         .info-box {
-            background: #fffbeb;
+            background: #f9fafb;
             padding: 1.25rem;
             margin: 1.5rem 0;
-            border: 1px solid #d1d5db;
+            border: 1px solid #e5e7eb;
         }
 
         .info-box strong {
@@ -195,20 +198,21 @@
             color: #6b7280;
         }
 
-        .warning {
-            background: #fef2f2;
+        /* Neutral disclaimer — no red panel */
+        .disclaimer {
+            background: #f9fafb;
             padding: 1.25rem;
             margin: 1.5rem 0;
-            border: 1px solid #d1d5db;
-            border-left: 4px solid #b91c1c;
+            border: 1px solid #e5e7eb;
+            border-left: 4px solid #6b7280;
         }
 
-        .warning-title {
+        .disclaimer-title {
             font-family: Arial, Helvetica, sans-serif;
             font-weight: bold;
             font-size: 0.95rem;
             margin-bottom: 0.5rem;
-            color: #991b1b;
+            color: #374151;
         }
 
         .footer {
@@ -241,8 +245,10 @@
             margin-top: 0;
             font-family: 'Mini Pixel 7', ui-monospace, monospace;
             font-weight: normal;
-            font-size: 0.85rem;
+            font-size: 1.7rem;
             letter-spacing: 0.05em;
+            line-height: 1.2;
+            color: #111827;
         }
 
         .links-box p {
@@ -273,6 +279,27 @@
             margin-bottom: 0.35rem;
         }
 
+        dl.lite-defs {
+            margin: 1rem 0 1.25rem;
+            font-size: 0.9375rem;
+        }
+
+        dl.lite-defs dt {
+            font-family: Arial, Helvetica, sans-serif;
+            font-weight: bold;
+            color: #374151;
+            margin-top: 0.75rem;
+        }
+
+        dl.lite-defs dt:first-child {
+            margin-top: 0;
+        }
+
+        dl.lite-defs dd {
+            margin: 0.25rem 0 0 0;
+            padding-left: 0;
+        }
+
         @media print {
             body {
                 background: white;
@@ -293,10 +320,11 @@
 
         <div class="header">
             <p class="title-sub">Ligder Gazette</p>
-            <h1 class="title-pixel">Governance, LITE &amp; the forum</h1>
+            <h1 class="title-pixel">Governance, LITE, forums &amp; Liteboards</h1>
             <p class="subtitle">
-                A short paper on how Ligder ties a Solana token to an oldschool forum: wallet-native identity,
-                stake-weighted voice, on-chain attestations where we relay them, and a stack you can read and fork.
+                A paper on how Ligder ties a Solana token to an oldschool forum—wallet-native identity,
+                stake-weighted voice, on-chain attestations where we relay them, <strong>per-token Liteboards</strong> for
+                pump.fun communities, and a stack you can read and fork.
             </p>
             <div class="metadata">
                 Living document · Solana · LITE governance token · Open source
@@ -306,14 +334,15 @@
         <div class="body-pad">
             <div class="abstract">
                 <strong>Abstract</strong><br><br>
-                Ligder is built on a simple premise: the best projects are the ones where the community actually
-                matters. We pair a governance token (<strong>LITE</strong>) with a stratified forum—think bitcointalk
-                with wallets. You register with a single sign message; we read your LITE balance on-chain and show it
-                on your profile and beside your posts. The forum is not flat: casual boards stay open; governance and
-                treasury-facing discussion sit behind thresholds. Where we relay them, new threads and replies are
-                attested on Solana Memo so hashes can be checked against what you see; full bodies stay in the database
-                for speed and search. Nothing here is meant to be opaque: the repo is public, and the dividend-claim path
-                for pool fees is there for anyone to verify.
+                Ligder pairs a governance token (<strong>LITE</strong>) with a stratified forum—think bitcointalk with
+                wallets. You register with a single sign message; we read your LITE balance on-chain and show it on your
+                profile and beside your posts. The forum is not flat: casual boards stay open; governance and
+                treasury-facing discussion sit behind thresholds. Separately, <strong>Liteboards</strong> attach a small
+                two-channel forum (announcement + general) to any <strong>pump.fun–listed</strong> SPL mint you verify and
+                deploy, so each token community can host discussion beside the main Ligder boards. Where we relay them,
+                new threads and replies are attested on Solana Memo so hashes can be checked against what you see; full
+                bodies stay in the database for speed and search. Nothing here is meant to be opaque: the repo is public,
+                and the dividend-claim path for pool fees is there for anyone to verify.
             </div>
 
             <div class="info-box">
@@ -323,6 +352,7 @@
                     <li><strong>Governance token:</strong> LITE (mint configured in deployment)</li>
                     <li><strong>Identity:</strong> Phantom (or compatible) wallet + optional username registration</li>
                     <li><strong>Forum:</strong> Sections, boards, markdown, per-board minimum rank for threads/replies</li>
+                    <li><strong>Liteboards:</strong> Optional mini-forums per pump.fun token mint (owner + registered users)</li>
                     <li><strong>Code:</strong> Open source—fork, tune config, ship your own deployment</li>
                 </ul>
             </div>
@@ -356,7 +386,40 @@
                 <a href="/forums">Forums</a>.
             </p>
 
-            <h2>IV. On-chain attestations &amp; archive</h2>
+            <h2>IV. Liteboards</h2>
+            <p>
+                <strong>Liteboards</strong> are a second layer of discussion: small, mint-keyed forums for individual
+                tokens—without replacing the main Ligder forum. Deploy is <strong>self-serve</strong> for tokens that appear
+                on <strong>pump.fun</strong> (we verify the mint against their public index and related checks). After you
+                prove control of the mint workflow and register on Ligder, you can create a board at
+                <code style="font-size: 0.88em;">/liteboard/&lt;mint&gt;</code> with exactly two channels:
+            </p>
+            <dl class="lite-defs">
+                <dt>Announcement</dt>
+                <dd>
+                    Owner-only: the wallet that deployed the Liteboard may start threads here—suitable for official
+                    project updates, same spirit as Ligder Official megaphone-style boards.
+                </dd>
+                <dt>General</dt>
+                <dd>
+                    Any <strong>registered</strong> Ligder user may participate—community chat in the spirit of Ligder
+                    General, but scoped to that token’s page.
+                </dd>
+            </dl>
+            <p>
+                Market cap and implied per-token figures shown on the hub and explorer come from <strong>pump.fun</strong>
+                metadata where available (for example implied $/token from their market-cap convention). The
+                <a href="/liteboard/explorer">Liteboard Explorer</a> lists boards, sorts by activity or market cap, and
+                supports search by mint. Deploy lives at <a href="/liteboard/deploy">Deploy a Liteboard</a>. Liteboard
+                threads and posts are stored in their own tables and APIs; they do not use the same <code style="font-size: 0.88em;">forum_boards</code>
+                slug model as the main forum, but the <em>experience</em>—sign to post, registered identity—is aligned.
+            </p>
+            <p class="note">
+                Not every SPL mint qualifies: other launchpads and arbitrary mints may be excluded until the same class
+                of verification exists. Treat the in-app deploy screen as the source of truth.
+            </p>
+
+            <h2>V. On-chain attestations &amp; archive</h2>
             <p>
                 Where the stack relays them, <strong>new threads and replies are attested on-chain</strong> via Solana Memo
                 (hashes align with what you read in the UI). Full post bodies remain in the database for latency and
@@ -364,8 +427,12 @@
                 commitments with forum content. If something does not match, you can see it—not because we promise
                 perfection, but because the design assumes verification.
             </p>
+            <p class="note">
+                Liteboard posts are not necessarily relayed through the same Memo pipeline as main-forum posts; check the
+                implementation for the current behavior.
+            </p>
 
-            <h2>V. Fees, dividends &amp; verification</h2>
+            <h2>VI. Fees, dividends &amp; verification</h2>
             <p>
                 Liquidity-pool fees flow into a dividend-claim system: the plumbing is in the repo so holders and
                 auditors can trace how pool fees become claims for LITE holders. Treat every number in the UI as
@@ -373,9 +440,9 @@
                 curve.
             </p>
 
-            <h2>VI. What we do not claim</h2>
-            <div class="warning">
-                <div class="warning-title">Read carefully</div>
+            <h2>VII. What we do not claim</h2>
+            <div class="disclaimer">
+                <div class="disclaimer-title">Read carefully</div>
                 <p style="margin-bottom: 0.75rem;">
                     Ligder is experimental software. Token price, liquidity, and third-party infrastructure are outside
                     this document. Nothing here is investment, legal, or tax advice.
@@ -384,13 +451,15 @@
                     <li>Smart contracts and deployments can have bugs; audits do not guarantee safety.</li>
                     <li>Governance outcomes depend on participation and on-chain reality, not this HTML file.</li>
                     <li>RPC endpoints, wallets, and bridges can fail or behave unexpectedly.</li>
+                    <li>Liteboard eligibility and pump.fun listings depend on third-party services and policy; they can change.</li>
                 </ul>
             </div>
 
-            <h2>VII. Conclusion</h2>
+            <h2>VIII. Conclusion</h2>
             <p>
                 Ligder is a toolkit for communities that want to own governance: no VC carve-out, no team allocation
-                story in this design—just holders, a forum, and code you can inspect. The Gazette is not a contract;
+                story in this design—just holders, a forum, optional per-token Liteboards for aligned communities, and code
+                you can inspect. The Gazette is not a contract;
                 it is orientation. If the implementation drifts, the repository and the chain win over this page.
             </p>
             <p>
@@ -401,7 +470,10 @@
 
             <div class="links-box">
                 <h3>Links</h3>
-                <p><a href="/">Ligder home</a> · <a href="/forums">Forums</a> · <a href="/forums/archive">Archive &amp; Verify</a></p>
+                <p>
+                    <a href="/">Ligder home</a> · <a href="/forums">Forums</a> · <a href="/forums/archive">Archive &amp; Verify</a>
+                    · <a href="/liteboard/explorer">Liteboard Explorer</a> · <a href="/liteboard/deploy">Deploy Liteboard</a>
+                </p>
                 <p class="note" style="margin-bottom: 0;">Source code: see the project repository for contracts, API, and frontend.</p>
             </div>
 
