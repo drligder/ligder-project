@@ -74,12 +74,12 @@ const Ligder = () => {
 
       <p className="academic-text">
         A <strong>Liteboard</strong> is a small, separate forum tied to <strong>one SPL token mint</strong>,
-        outside the main Ligder section boards. You connect a wallet, paste a mint address, and sign a short
-        message so the server knows which wallet will <strong>own</strong> the board. The backend uses your
-        Solana RPC to confirm the address is a valid SPL mint (classic and Token-2022), then issues a{' '}
-        <strong>one-time code</strong> (stored only as a hash; it expires and works once, for that wallet and
-        mint). You register a Ligder username if you haven&apos;t already, then sign a second message with
-        that code to <strong>create</strong> the board.
+        outside the main Ligder section boards. <strong>Deploy is limited to tokens listed on pump.fun</strong>{' '}
+        (verified via their public API); other launchpads are not supported for self-serve setup yet. You
+        connect a wallet, paste the mint, and sign so we know which wallet will <strong>own</strong> the board.
+        The server issues a <strong>one-time code</strong> (stored only as a hash; it expires and works once).
+        Register a Ligder username if needed, then sign again with that code to <strong>create</strong> the
+        board.
       </p>
 
       <p className="academic-text">

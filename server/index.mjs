@@ -1626,11 +1626,12 @@ function trimSplMetaDisplayString(raw) {
 }
 
 /**
- * pump.fun frontend API — coin record includes creator, name, symbol (e.g. pump / launchpad tokens).
+ * pump.fun frontend API — always hits the network (used for deploy eligibility & strict creator).
  * @see https://frontend-api-v3.pump.fun/coins/{mint}
+ * @returns {Promise<object|null>} Coin JSON, or null if 404 / empty body.
+ * @throws On non-404 HTTP errors, timeout, or network failure (caller may catch).
  */
-async function fetchPumpFunCoinRecord(mintCanon) {
-  if (!LITEBOARD_USE_PUMP_FUN) return null;
+async function fetchPumpFunCoinRecordRaw(mintCanon) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 12_000);
   try {
@@ -1646,14 +1647,54 @@ async function fetchPumpFunCoinRecord(mintCanon) {
       }
     );
     if (res.status === 404) return null;
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const err = new Error(`pump.fun HTTP ${res.status}`);
+      err.code = 'PUMP_HTTP';
+      throw err;
+    }
     const body = await res.json().catch(() => null);
     if (!body || typeof body !== 'object') return null;
     return body;
-  } catch {
-    return null;
+  } catch (e) {
+    if (e?.name === 'AbortError') {
+      const err = new Error('pump.fun timeout');
+      err.code = 'PUMP_TIMEOUT';
+      throw err;
+    }
+    throw e;
   } finally {
     clearTimeout(t);
+  }
+}
+
+/** pump.fun JSON for optional metadata paths; disabled when LITEBOARD_USE_PUMP_FUN=0. */
+async function fetchPumpFunCoinRecord(mintCanon) {
+  if (!LITEBOARD_USE_PUMP_FUN) return null;
+  try {
+    return await fetchPumpFunCoinRecordRaw(mintCanon);
+  } catch {
+    return null;
+  }
+}
+
+/** Deploy requires the mint to exist on pump.fun (public coin index). */
+async function assertMintListedOnPumpFunForLiteboardDeploy(mintCanon) {
+  try {
+    const rec = await fetchPumpFunCoinRecordRaw(mintCanon);
+    if (!rec) {
+      return {
+        ok: false,
+        error:
+          'Liteboard deploy is only supported for tokens listed on pump.fun (as of now). Other launchpads and SPL tokens are not supported yet.',
+      };
+    }
+    return { ok: true };
+  } catch (e) {
+    const msg =
+      e?.code === 'PUMP_TIMEOUT' || /timeout/i.test(String(e?.message ?? ''))
+        ? 'Could not reach pump.fun in time. Try again in a moment.'
+        : 'Could not verify this mint on pump.fun. Try again later.';
+    return { ok: false, error: msg };
   }
 }
 
@@ -1763,6 +1804,54 @@ async function fetchSplMintDisplayMetadata(mintCanon) {
 }
 
 /**
+ * Per-liteboard thread count and total post count (all channels) for explorer list.
+ */
+async function enrichLiteboardExplorerStats(rows) {
+  if (!rows?.length) return [];
+  const lbIds = rows.map((r) => r.id);
+  const { data: threads, error: tErr } = await supabase
+    .from('liteboard_threads')
+    .select('id, liteboard_id')
+    .in('liteboard_id', lbIds);
+  if (tErr) {
+    console.error(tErr);
+    return rows.map((r) => ({
+      ...r,
+      threads_count: 0,
+      posts_count: 0,
+    }));
+  }
+  const thList = threads ?? [];
+  const threadCountByLb = {};
+  const threadToLb = {};
+  for (const t of thList) {
+    threadCountByLb[t.liteboard_id] = (threadCountByLb[t.liteboard_id] || 0) + 1;
+    threadToLb[t.id] = t.liteboard_id;
+  }
+  const threadIds = thList.map((t) => t.id);
+  const postCountByLb = {};
+  if (threadIds.length > 0) {
+    const { data: posts, error: pErr } = await supabase
+      .from('liteboard_thread_posts')
+      .select('thread_id')
+      .in('thread_id', threadIds);
+    if (pErr) {
+      console.error(pErr);
+    } else {
+      for (const p of posts ?? []) {
+        const lb = threadToLb[p.thread_id];
+        if (lb) postCountByLb[lb] = (postCountByLb[lb] || 0) + 1;
+      }
+    }
+  }
+  return rows.map((r) => ({
+    ...r,
+    threads_count: threadCountByLb[r.id] ?? 0,
+    posts_count: postCountByLb[r.id] ?? 0,
+  }));
+}
+
+/**
  * Add token_name / token_symbol to each row for GET /api/liteboards (explorer list).
  * Bounded parallelism to avoid slamming RPC and Jupiter.
  */
@@ -1835,16 +1924,16 @@ async function assertWalletIsMintCreator(walletBase58, mintInput) {
     return { ok: true, mint: mintCanonical };
   }
 
-  if (LITEBOARD_USE_PUMP_FUN) {
-    try {
-      const pump = await fetchPumpFunCoinRecord(mintCanonical);
-      const pumpCreator = pump?.creator != null ? trimSplMetaDisplayString(pump.creator) : null;
+  try {
+    const pump = await fetchPumpFunCoinRecordRaw(mintCanonical);
+    if (pump?.creator != null) {
+      const pumpCreator = trimSplMetaDisplayString(pump.creator);
       if (pumpCreator === walletCanon) {
         return { ok: true, mint: mintCanonical };
       }
-    } catch (e) {
-      console.error('liteboard pump.fun creator check', e);
     }
+  } catch (e) {
+    console.error('liteboard pump.fun creator check', e);
   }
 
   if (SOLSCAN_API_KEY && LITEBOARD_USE_SOLSCAN_CREATOR) {
@@ -6839,9 +6928,8 @@ app.post('/api/admin/board-update', async (req, res) => {
 });
 
 /**
- * Create a Liteboard without creator proof (admin trust). Use when explorers show the user as
- * creator/owner but automated checks fail (launchpads, API/UI mismatch).
- * Body: { mint, owner_wallet } — owner must already have a profile.
+ * Create a Liteboard without self-serve deploy rules (admin trust). Use for non–pump.fun mints or
+ * when normal deploy is unavailable. Body: { mint, owner_wallet } — owner must already have a profile.
  */
 app.post('/api/admin/liteboard/grant', async (req, res) => {
   if (!(await requireAdminAuth(req, res))) return;
@@ -7225,6 +7313,10 @@ app.post('/api/liteboard/verify-mint', async (req, res) => {
     return res.status(403).json({ error: authCheck.error });
   }
   const mintCanon = authCheck.mint;
+  const pumpListed = await assertMintListedOnPumpFunForLiteboardDeploy(mintCanon);
+  if (!pumpListed.ok) {
+    return res.status(403).json({ error: pumpListed.error });
+  }
   const { data: taken } = await supabase
     .from('liteboards')
     .select('id')
@@ -7314,6 +7406,10 @@ app.post('/api/liteboard/create', async (req, res) => {
     return res.status(403).json({ error: authCheck2.error });
   }
   const mintCanon = authCheck2.mint;
+  const pumpListedCreate = await assertMintListedOnPumpFunForLiteboardDeploy(mintCanon);
+  if (!pumpListedCreate.ok) {
+    return res.status(403).json({ error: pumpListedCreate.error });
+  }
   const codeHash = sha256Hex(parsed.code);
   const nowIso = new Date().toISOString();
   const { data: codeRow, error: codeFindErr } = await supabase
@@ -7397,13 +7493,24 @@ app.get('/api/liteboards', async (req, res) => {
   if (rows.length === 0) {
     return res.json({ liteboards: [] });
   }
+  let withStats;
   try {
-    const enriched = await enrichLiteboardsTokenMeta(rows);
+    withStats = await enrichLiteboardExplorerStats(rows);
+  } catch (e) {
+    console.error('liteboard explorer stats', e);
+    withStats = rows.map((r) => ({
+      ...r,
+      threads_count: 0,
+      posts_count: 0,
+    }));
+  }
+  try {
+    const enriched = await enrichLiteboardsTokenMeta(withStats);
     return res.json({ liteboards: enriched });
   } catch (e) {
     console.error('liteboard explorer enrich', e);
     return res.json({
-      liteboards: rows.map((r) => ({
+      liteboards: withStats.map((r) => ({
         ...r,
         token_name: null,
         token_symbol: null,

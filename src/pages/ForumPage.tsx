@@ -256,6 +256,12 @@ const ForumPage = () => {
             Liteboard Explorer
           </Link>
         </div>
+        <p
+          className="mb-6 text-center text-xs text-gray-600 max-w-xl mx-auto"
+          style={{ fontFamily: 'Arial, sans-serif' }}
+        >
+          Liteboard deploy supports <strong>pump.fun</strong> tokens only for now.
+        </p>
 
         <div
           className="mb-6 flex flex-wrap items-center justify-between gap-3 border border-gray-400 bg-gray-50 px-3 py-2.5 text-sm text-gray-800"

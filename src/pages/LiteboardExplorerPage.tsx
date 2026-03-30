@@ -14,6 +14,8 @@ type LiteboardRow = {
   created_at: string;
   token_name?: string | null;
   token_symbol?: string | null;
+  threads_count?: number;
+  posts_count?: number;
 };
 
 const LiteboardExplorerPage = () => {
@@ -75,8 +77,13 @@ const LiteboardExplorerPage = () => {
         <h1 className="text-xl font-bold mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
           Liteboard Explorer
         </h1>
-        <p className="text-sm text-gray-700 mb-4" style={{ fontFamily: 'Times New Roman, serif' }}>
+        <p className="text-sm text-gray-700 mb-2" style={{ fontFamily: 'Times New Roman, serif' }}>
           Search by mint address (prefix ok). Open a board to read or post in General (registered users).
+        </p>
+        <p className="text-xs text-amber-900 border border-amber-200 bg-amber-50 px-3 py-2 mb-4" style={{ fontFamily: 'Arial, sans-serif' }}>
+          <strong>Deploying a Liteboard</strong> is limited to tokens listed on{' '}
+          <strong>pump.fun</strong> for now. Other launchpads (e.g. LetsBonk) and generic SPL mints are not
+          supported for self-serve deploy yet.
         </p>
 
         <div className="flex flex-wrap gap-2 mb-4">
@@ -112,11 +119,16 @@ const LiteboardExplorerPage = () => {
           <ul className="list-none m-0 p-0 border border-gray-300 divide-y divide-gray-200">
             {rows.map((lb) => {
               const label = liteboardTokenLabel(lb.token_name, lb.token_symbol);
+              const tc = Number(lb.threads_count) || 0;
+              const pc = Number(lb.posts_count) || 0;
               return (
-                <li key={lb.id} className="p-0 hover:bg-gray-50">
+                <li
+                  key={lb.id}
+                  className="flex flex-col sm:flex-row sm:items-stretch p-0 hover:bg-gray-50"
+                >
                   <Link
                     to={`/liteboard/${encodeURIComponent(lb.mint)}`}
-                    className="block p-3 no-underline text-gray-900 hover:bg-gray-50"
+                    className="flex-1 min-w-0 block p-3 no-underline text-gray-900 hover:bg-gray-50"
                   >
                     {label ? (
                       <div
@@ -133,6 +145,17 @@ const LiteboardExplorerPage = () => {
                       Since {new Date(lb.created_at).toLocaleString()}
                     </div>
                   </Link>
+                  <div
+                    className="flex sm:flex-col justify-end sm:justify-center gap-3 sm:gap-1 px-3 py-3 sm:py-3 sm:min-w-[7.5rem] sm:border-l border-gray-200 text-xs text-gray-600 tabular-nums text-right sm:text-right"
+                    style={{ fontFamily: 'Arial, sans-serif' }}
+                  >
+                    <span>
+                      {tc} thread{tc === 1 ? '' : 's'}
+                    </span>
+                    <span>
+                      {pc} post{pc === 1 ? '' : 's'}
+                    </span>
+                  </div>
                 </li>
               );
             })}

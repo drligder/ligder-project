@@ -63,7 +63,7 @@ const LiteboardDeployPage = () => {
       setVerifiedMint(j.mint ?? mint);
       setAuthCode(j.authentication_code ?? null);
       setCodeExpires(j.expires_at ?? null);
-      showToast('Creator verified. Save your one-time code.', 'success');
+      showToast('Verified. Save your one-time code.', 'success');
     } catch (e) {
       setVerifiedMint(null);
       setAuthCode(null);
@@ -146,13 +146,15 @@ const LiteboardDeployPage = () => {
         <h1 className="text-xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
           Deploy a Liteboard
         </h1>
+        <p className="text-sm text-gray-700 mb-3" style={{ fontFamily: 'Times New Roman, serif' }}>
+          <strong>Self-serve deploy only supports tokens listed on pump.fun</strong> (we verify against their
+          public coin API). Other launchpads and generic SPL mints are not available here yet.
+        </p>
         <p className="text-sm text-gray-700 mb-6" style={{ fontFamily: 'Times New Roman, serif' }}>
-          Paste a valid <strong>SPL mint</strong> (classic or Token-2022). You sign a short message so we know
-          which wallet will own the board; the server only checks that the mint exists on-chain. You&apos;ll get
-          a one-time code, then sign again to create a public mini-forum at{' '}
-          <code className="text-xs bg-gray-100 px-1">/liteboard/&lt;mint&gt;</code> with an{' '}
-          <strong>Announcement</strong> channel (you only) and <strong>General</strong> (any registered Ligder
-          user).
+          Paste the token&apos;s <strong>mint address</strong>. You sign so we know which wallet will own the
+          board. You&apos;ll get a one-time code, then sign again to create a mini-forum at{' '}
+          <code className="text-xs bg-gray-100 px-1">/liteboard/&lt;mint&gt;</code> with{' '}
+          <strong>Announcement</strong> (owner only) and <strong>General</strong> (registered Ligder users).
         </p>
 
         <div className="space-y-4 border border-gray-300 bg-gray-50 p-4">
