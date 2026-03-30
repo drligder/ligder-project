@@ -22,6 +22,10 @@ type DividendStatusResponse = {
   open_period_deposit_total_raw: string;
   open_period_claimable_pot_raw: string;
   open_period_management_reserve_raw: string;
+  /** SPL balance of `lite_token_mint` in the treasury wallet (RPC). */
+  treasury_onchain_lite_raw?: string;
+  /** Mint used for the balance read (must match your LITE env / project.public.json). */
+  lite_token_mint?: string;
   myEntitlement: null | {
     balance_snapshot_raw: string;
     entitlement_raw: string;
@@ -63,16 +67,13 @@ const LITE_TOKEN_DECIMALS = 6n;
 const TEN = 10n;
 const DIVIDENDS_PERIOD_SECONDS = 6 * 60 * 60;
 
+/** Whole LITE tokens only (truncate base units); avoids noisy fractional digits on the dividends UI. */
 function formatRawLite(raw: string | bigint | null | undefined): string {
   if (raw == null) return '—';
   const v = typeof raw === 'bigint' ? raw : BigInt(String(raw));
   const denom = TEN ** LITE_TOKEN_DECIMALS;
   const whole = v / denom;
-  const frac = v % denom;
-  if (frac === 0n) return whole.toString();
-  const fracStr = frac.toString().padStart(Number(LITE_TOKEN_DECIMALS), '0');
-  const fracTrimmed = fracStr.replace(/0+$/g, '');
-  return `${whole.toString()}.${fracTrimmed}`;
+  return whole.toString();
 }
 
 function formatShareBps(shareBps: string): string {
@@ -544,10 +545,10 @@ const DividendsPage = () => {
                       className="text-base font-bold text-gray-900 sm:text-lg"
                       style={{ fontFamily: 'Arial, sans-serif' }}
                     >
-                      Accruing this period
+                      Treasury on-chain (LITE)
                     </div>
                     <div className="text-xs text-gray-600" style={{ fontFamily: 'Arial, sans-serif' }}>
-                      LITE recorded via admin deposit tx (current 6h window — not yet finalized)
+                      Actual token balance in the treasury wallet for the configured LITE mint (Solana RPC).
                     </div>
                     {status?.treasury_wallet ? (
                       <div
@@ -584,49 +585,63 @@ const DividendsPage = () => {
                         </a>
                       </div>
                     ) : null}
+                    {status?.lite_token_mint ? (
+                      <div
+                        className="mt-1 text-[10px] text-gray-500 break-all"
+                        style={{ fontFamily: 'Arial, sans-serif' }}
+                      >
+                        Mint used for this read: <span className="font-mono">{status.lite_token_mint}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="font-mono text-2xl font-semibold tabular-nums text-gray-900 sm:text-3xl">
-                  {status?.open_period_deposit_total_raw != null
-                    ? `${formatRawLite(status.open_period_deposit_total_raw)} LITE`
-                    : '—'}
+                  {`${formatRawLite(status?.treasury_onchain_lite_raw ?? '0')} LITE`}
                 </div>
-                <div className="mt-3 text-xs text-gray-700 sm:text-sm space-y-0.5">
-                  <div>
-                    Deposits (raw):{' '}
-                    <span className="font-mono">
-                      {status?.open_period_deposit_total_raw != null
-                        ? `${formatRawLite(status.open_period_deposit_total_raw)}`
-                        : '—'}{' '}
-                      LITE
-                    </span>
+
+                <div className="mt-6 pt-5 border-t border-gray-200">
+                  <div
+                    className="text-sm font-bold text-gray-900 mb-0.5"
+                    style={{ fontFamily: 'Arial, sans-serif' }}
+                  >
+                    Recorded this 6h window (admin)
                   </div>
-                  <div>
-                    Claimable preview (75%):{' '}
-                    <span className="font-mono">
-                      {status?.open_period_claimable_pot_raw != null
-                        ? `${formatRawLite(status.open_period_claimable_pot_raw)}`
-                        : '—'}{' '}
-                      LITE
-                    </span>
+                  <div className="text-xs text-gray-600 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    Sum of deposit tx signatures filed in the control panel for the current period only. If you
+                    deposited in an earlier window, this can be 0 while treasury on-chain above is still correct.
+                    No new deposit required for the on-chain line.
                   </div>
-                  <div>
-                    Management preview (25%):{' '}
-                    <span className="font-mono">
-                      {status?.open_period_management_reserve_raw != null
-                        ? `${formatRawLite(status.open_period_management_reserve_raw)}`
-                        : '—'}{' '}
-                      LITE
-                    </span>
+                  <div className="font-mono text-xl font-semibold tabular-nums text-gray-900 sm:text-2xl">
+                    {`${formatRawLite(status?.open_period_deposit_total_raw ?? '0')} LITE`}
                   </div>
-                  {typeof status?.open_period_end_unix === 'number' ? (
-                    <div className="text-gray-600 pt-1">
-                      Window ends (UTC):{' '}
+                  <div className="mt-2 text-xs text-gray-700 sm:text-sm space-y-0.5">
+                    <div>
+                      Deposits (raw):{' '}
                       <span className="font-mono">
-                        {new Date(status.open_period_end_unix * 1000).toISOString().replace('T', ' ').slice(0, 19)}
+                        {formatRawLite(status?.open_period_deposit_total_raw ?? '0')} LITE
                       </span>
                     </div>
-                  ) : null}
+                    <div>
+                      Claimable preview (75%):{' '}
+                      <span className="font-mono">
+                        {formatRawLite(status?.open_period_claimable_pot_raw ?? '0')} LITE
+                      </span>
+                    </div>
+                    <div>
+                      Management preview (25%):{' '}
+                      <span className="font-mono">
+                        {formatRawLite(status?.open_period_management_reserve_raw ?? '0')} LITE
+                      </span>
+                    </div>
+                    {typeof status?.open_period_end_unix === 'number' ? (
+                      <div className="text-gray-600 pt-1">
+                        Window ends (UTC):{' '}
+                        <span className="font-mono">
+                          {new Date(status.open_period_end_unix * 1000).toISOString().replace('T', ' ').slice(0, 19)}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="mt-6 pt-5 border-t border-gray-200">

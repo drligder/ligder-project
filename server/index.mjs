@@ -3152,6 +3152,22 @@ app.get('/api/dividends/status', async (req, res) => {
     };
   }
 
+  let treasuryOnchainLiteRaw = '0';
+  if (treasuryWalletPublic && LITE_TOKEN_MINT) {
+    try {
+      const tbal = await fetchLiteHoldingsRaw(treasuryWalletPublic);
+      treasuryOnchainLiteRaw = tbal.toString();
+    } catch (e) {
+      console.error('[dividends] treasury on-chain LITE balance failed', e);
+    }
+  }
+
+  const poolFields = {
+    ...openAcc,
+    treasury_onchain_lite_raw: treasuryOnchainLiteRaw,
+    lite_token_mint: LITE_TOKEN_MINT,
+  };
+
   // Latest finalized period.
   const { data: latest, error: latestErr } = await supabase
     .from('dividend_periods')
@@ -3168,7 +3184,7 @@ app.get('/api/dividends/status', async (req, res) => {
 
   if (!latest) {
     return res.json({
-      ...openAcc,
+      ...poolFields,
       latestPeriod: null,
       claimable_pot_raw: '0',
       management_reserve_raw: '0',
@@ -3191,7 +3207,7 @@ app.get('/api/dividends/status', async (req, res) => {
   const nextSnapshotUnix = claimDeadlineUnix;
 
   const finalizedBase = {
-    ...openAcc,
+    ...poolFields,
     latestPeriod: latest.period_id,
     claimable_pot_raw: latest.claimable_pot_raw,
     management_reserve_raw: latest.management_reserve_raw,
