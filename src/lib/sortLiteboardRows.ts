@@ -23,7 +23,7 @@ function finiteOrNull(n: unknown): number | null {
   return Number.isFinite(x) ? x : null;
 }
 
-/** Client-side sort for explorer (API returns newest-first; this reorders the loaded list). */
+/** Sort logic mirrored server-side for non-`newest` explorer sorts (see GET /api/liteboards). */
 export function sortLiteboardRows(
   rows: LiteboardExplorerRow[],
   key: LiteboardSortKey

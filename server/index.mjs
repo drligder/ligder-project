@@ -1872,6 +1872,53 @@ async function enrichLiteboardExplorerStats(rows) {
   }));
 }
 
+const LITEBOARD_EXPLORER_SORT_KEYS = new Set([
+  'newest',
+  'mc_desc',
+  'mc_asc',
+  'threads_desc',
+  'posts_desc',
+]);
+/** Max rows loaded when sorting by MC / activity (enrichment is expensive). */
+const LITEBOARD_EXPLORER_SORT_FETCH_CAP = 400;
+
+function sortExplorerLiteboardRows(rows, key) {
+  const out = [...rows];
+  const finiteOrNull = (n) => {
+    const x = Number(n);
+    return Number.isFinite(x) ? x : null;
+  };
+  out.sort((a, b) => {
+    switch (key) {
+      case 'newest':
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      case 'mc_desc': {
+        const na = finiteOrNull(a.usd_market_cap);
+        const nb = finiteOrNull(b.usd_market_cap);
+        if (na == null && nb == null) return 0;
+        if (na == null) return 1;
+        if (nb == null) return -1;
+        return nb - na;
+      }
+      case 'mc_asc': {
+        const na = finiteOrNull(a.usd_market_cap);
+        const nb = finiteOrNull(b.usd_market_cap);
+        if (na == null && nb == null) return 0;
+        if (na == null) return 1;
+        if (nb == null) return -1;
+        return na - nb;
+      }
+      case 'threads_desc':
+        return (Number(b.threads_count) || 0) - (Number(a.threads_count) || 0);
+      case 'posts_desc':
+        return (Number(b.posts_count) || 0) - (Number(a.posts_count) || 0);
+      default:
+        return 0;
+    }
+  });
+  return out;
+}
+
 /**
  * Add token_name / token_symbol to each row for GET /api/liteboards (explorer list).
  * Bounded parallelism to avoid slamming RPC and Jupiter.
@@ -7577,64 +7624,162 @@ app.post('/api/liteboard/delete', async (req, res) => {
 
 app.get('/api/liteboards', async (req, res) => {
   const q = String(req.query.q ?? '').trim();
-  let query = supabase
+  const pageRaw = parseInt(String(req.query.page ?? '1'), 10);
+  const limitRaw = parseInt(String(req.query.limit ?? '10'), 10);
+  const page = Number.isFinite(pageRaw) && pageRaw >= 1 ? pageRaw : 1;
+  const limit = Math.min(50, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 10));
+
+  let sortKey = String(req.query.sort ?? 'newest').trim();
+  if (!LITEBOARD_EXPLORER_SORT_KEYS.has(sortKey)) sortKey = 'newest';
+
+  let mintFilter = null;
+  if (q.length >= 3) {
+    try {
+      mintFilter = new PublicKey(q).toBase58();
+    } catch {
+      mintFilter = q;
+    }
+  }
+
+  const jsonMeta = (liteboards, totalCount) => ({
+    liteboards,
+    page,
+    limit,
+    total_count: totalCount,
+    total_pages: totalCount > 0 ? Math.ceil(totalCount / limit) : 1,
+  });
+
+  const enrichAndSend = async (rows, totalCount) => {
+    if (!rows.length) {
+      return res.json(jsonMeta([], totalCount));
+    }
+    let withStats;
+    try {
+      withStats = await enrichLiteboardExplorerStats(rows);
+    } catch (e) {
+      console.error('liteboard explorer stats', e);
+      withStats = rows.map((r) => ({
+        ...r,
+        threads_count: 0,
+        posts_count: 0,
+      }));
+    }
+    try {
+      const enriched = await enrichLiteboardsTokenMeta(withStats);
+      return res.json(jsonMeta(enriched, totalCount));
+    } catch (e) {
+      console.error('liteboard explorer enrich', e);
+      return res.json(
+        jsonMeta(
+          withStats.map((r) => ({
+            ...r,
+            token_name: null,
+            token_symbol: null,
+            usd_market_cap: null,
+            token_price_usd: null,
+          })),
+          totalCount
+        )
+      );
+    }
+  };
+
+  if (sortKey === 'newest') {
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let dataQuery = supabase
+      .from('liteboards')
+      .select('id, mint, owner_wallet, created_at')
+      .order('created_at', { ascending: false })
+      .range(from, to);
+    let countQuery = supabase.from('liteboards').select('id', { count: 'exact', head: true });
+    if (mintFilter != null) {
+      dataQuery = supabase
+        .from('liteboards')
+        .select('id, mint, owner_wallet, created_at')
+        .ilike('mint', `%${mintFilter}%`)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      countQuery = supabase
+        .from('liteboards')
+        .select('id', { count: 'exact', head: true })
+        .ilike('mint', `%${mintFilter}%`);
+    }
+
+    const [{ data, error }, { count: totalCount, error: cErr }] = await Promise.all([
+      dataQuery,
+      countQuery,
+    ]);
+    if (error) {
+      const m = String(error.message ?? '');
+      if (/does not exist|relation/i.test(m)) {
+        return res.json(jsonMeta([], 0));
+      }
+      console.error(error);
+      return res.status(500).json({ error: error.message });
+    }
+    if (cErr) {
+      console.error(cErr);
+      return res.status(500).json({ error: cErr.message });
+    }
+    const total = Number(totalCount) || 0;
+    return enrichAndSend(data ?? [], total);
+  }
+
+  let fetchQuery = supabase
     .from('liteboards')
     .select('id, mint, owner_wallet, created_at')
     .order('created_at', { ascending: false })
-    .limit(100);
-  if (q.length >= 3) {
-    let canon = q;
-    try {
-      canon = new PublicKey(q).toBase58();
-    } catch {
-      /* prefix search on raw */
-    }
-    query = supabase
+    .limit(LITEBOARD_EXPLORER_SORT_FETCH_CAP);
+  if (mintFilter != null) {
+    fetchQuery = supabase
       .from('liteboards')
       .select('id, mint, owner_wallet, created_at')
-      .ilike('mint', `%${canon}%`)
+      .ilike('mint', `%${mintFilter}%`)
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(LITEBOARD_EXPLORER_SORT_FETCH_CAP);
   }
-  const { data, error } = await query;
-  if (error) {
-    const m = String(error.message ?? '');
+
+  const { data: allRows, error: fetchErr } = await fetchQuery;
+  if (fetchErr) {
+    const m = String(fetchErr.message ?? '');
     if (/does not exist|relation/i.test(m)) {
-      return res.json({ liteboards: [] });
+      return res.json(jsonMeta([], 0));
     }
-    console.error(error);
-    return res.status(500).json({ error: error.message });
+    console.error(fetchErr);
+    return res.status(500).json({ error: fetchErr.message });
   }
-  const rows = data ?? [];
-  if (rows.length === 0) {
-    return res.json({ liteboards: [] });
-  }
+  const base = allRows ?? [];
   let withStats;
   try {
-    withStats = await enrichLiteboardExplorerStats(rows);
+    withStats = await enrichLiteboardExplorerStats(base);
   } catch (e) {
     console.error('liteboard explorer stats', e);
-    withStats = rows.map((r) => ({
+    withStats = base.map((r) => ({
       ...r,
       threads_count: 0,
       posts_count: 0,
     }));
   }
+  let enriched;
   try {
-    const enriched = await enrichLiteboardsTokenMeta(withStats);
-    return res.json({ liteboards: enriched });
+    enriched = await enrichLiteboardsTokenMeta(withStats);
   } catch (e) {
     console.error('liteboard explorer enrich', e);
-    return res.json({
-      liteboards: withStats.map((r) => ({
-        ...r,
-        token_name: null,
-        token_symbol: null,
-        usd_market_cap: null,
-        token_price_usd: null,
-      })),
-    });
+    enriched = withStats.map((r) => ({
+      ...r,
+      token_name: null,
+      token_symbol: null,
+      usd_market_cap: null,
+      token_price_usd: null,
+    }));
   }
+  const sorted = sortExplorerLiteboardRows(enriched, sortKey);
+  const total = sorted.length;
+  const sliceFrom = (page - 1) * limit;
+  const slice = sorted.slice(sliceFrom, sliceFrom + limit);
+  return res.json(jsonMeta(slice, total));
 });
 
 app.get('/api/liteboards/:mint', async (req, res) => {

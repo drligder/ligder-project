@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LoginDropdown } from '../components/LoginDropdown';
 import { useWallet } from '../contexts/WalletContext';
@@ -7,11 +7,9 @@ import { apiUrl } from '../lib/apiBase';
 import { formatUsdMarketCap, formatUsdPerToken } from '../lib/formatUsd';
 import { liteboardTokenLabel } from '../lib/liteboardTokenLabel';
 import { parseApiJson } from '../lib/parseApiJson';
-import {
-  type LiteboardExplorerRow,
-  type LiteboardSortKey,
-  sortLiteboardRows,
-} from '../lib/sortLiteboardRows';
+import type { LiteboardExplorerRow, LiteboardSortKey } from '../lib/sortLiteboardRows';
+
+const PAGE_SIZE = 10;
 
 const SORT_OPTIONS: { value: LiteboardSortKey; label: string }[] = [
   { value: 'newest', label: 'Newest first' },
@@ -29,33 +27,57 @@ const LiteboardExplorerPage = () => {
   const [q, setQ] = useState('');
   const [rows, setRows] = useState<LiteboardExplorerRow[]>([]);
   const [sortKey, setSortKey] = useState<LiteboardSortKey>('newest');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  /** Bumps when user clicks Search so we refetch even if already on page 1. */
+  const [searchNonce, setSearchNonce] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
-      const qs = q.trim().length >= 3 ? `?q=${encodeURIComponent(q.trim())}` : '';
-      const r = await fetch(apiUrl(`/api/liteboards${qs}`));
-      const j = await parseApiJson<{ liteboards?: LiteboardExplorerRow[]; error?: string }>(r);
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(PAGE_SIZE));
+      params.set('sort', sortKey);
+      if (q.trim().length >= 3) {
+        params.set('q', q.trim());
+      }
+      const r = await fetch(apiUrl(`/api/liteboards?${params.toString()}`));
+      const j = await parseApiJson<{
+        liteboards?: LiteboardExplorerRow[];
+        page?: number;
+        total_pages?: number;
+        total_count?: number;
+        error?: string;
+      }>(r);
       if (!r.ok) {
         throw new Error(j.error || 'Failed to load');
       }
       setRows(j.liteboards ?? []);
+      setTotalPages(Math.max(1, Number(j.total_pages) || 1));
+      setTotalCount(Number(j.total_count) || 0);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Failed to load');
       setRows([]);
+      setTotalPages(1);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }, [q]);
+  }, [q, page, sortKey, searchNonce]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const sortedRows = useMemo(() => sortLiteboardRows(rows, sortKey), [rows, sortKey]);
+  const runSearch = () => {
+    setPage(1);
+    setSearchNonce((n) => n + 1);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100/80 to-white text-gray-900">
@@ -85,8 +107,8 @@ const LiteboardExplorerPage = () => {
             Liteboard Explorer
           </h1>
           <p className="text-sm text-slate-600 max-w-2xl" style={{ fontFamily: 'Times New Roman, serif' }}>
-            Browse community mini-forums tied to pump.fun tokens. Search by mint, or sort by market cap and
-            activity.
+            Browse community mini-forums tied to pump.fun tokens. Search by mint, sort by market cap or activity,
+            and flip pages ({PAGE_SIZE} boards per page).
           </p>
         </div>
 
@@ -101,12 +123,18 @@ const LiteboardExplorerPage = () => {
             placeholder="Mint address (3+ chars to filter)"
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                runSearch();
+              }
+            }}
           />
           <button
             type="button"
             className="text-sm px-4 py-2.5 border border-slate-800 bg-white rounded-lg shadow-sm hover:bg-slate-50 font-medium"
             style={{ fontFamily: 'Arial, sans-serif' }}
-            onClick={() => void load()}
+            onClick={() => runSearch()}
           >
             Search
           </button>
@@ -117,7 +145,10 @@ const LiteboardExplorerPage = () => {
             <select
               id="lb-sort"
               value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as LiteboardSortKey)}
+              onChange={(e) => {
+                setSortKey(e.target.value as LiteboardSortKey);
+                setPage(1);
+              }}
               className="text-sm border border-slate-300 rounded-lg px-3 py-2.5 bg-white shadow-sm min-w-[12rem] focus:outline-none focus:ring-2 focus:ring-slate-400/40"
               style={{ fontFamily: 'Arial, sans-serif' }}
             >
@@ -136,24 +167,37 @@ const LiteboardExplorerPage = () => {
           </Link>
         </p>
 
+        {!loading && !err && totalCount > 0 ? (
+          <p className="text-xs text-slate-500 mb-4" style={{ fontFamily: 'Arial, sans-serif' }}>
+            {totalCount} board{totalCount === 1 ? '' : 's'}
+            {sortKey !== 'newest' ? ' · sorted from up to 400 most recent matches' : ''}
+          </p>
+        ) : null}
+
         {loading ? (
           <p className="text-sm text-slate-600">Loading…</p>
         ) : err ? (
           <p className="text-sm text-red-800">{err}</p>
-        ) : sortedRows.length === 0 ? (
+        ) : rows.length === 0 ? (
           <p className="text-sm text-slate-600">
             No Liteboards yet{q.trim().length >= 3 ? ' for that search' : ''}.
           </p>
         ) : (
-          <ul className="list-none m-0 p-0 space-y-4">
-            {sortedRows.map((lb) => {
-              const label = liteboardTokenLabel(lb.token_name, lb.token_symbol);
-              const tc = Number(lb.threads_count) || 0;
-              const pc = Number(lb.posts_count) || 0;
-              return (
-                <li key={lb.id}>
-                  <div className="rounded-xl border border-slate-200/90 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_minmax(0,20rem)] gap-0">
+          <>
+            <ul className="list-none m-0 p-0 space-y-4">
+              {rows.map((lb) => {
+                const label = liteboardTokenLabel(lb.token_name, lb.token_symbol);
+                const tc = Number(lb.threads_count) || 0;
+                const pc = Number(lb.posts_count) || 0;
+                const statBox =
+                  'rounded-lg bg-white border border-slate-200/90 px-2 py-2 sm:px-3 sm:py-2.5 text-center shadow-sm min-w-0';
+                const statLabel =
+                  'text-[9px] sm:text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5 leading-tight';
+                const statValue =
+                  'text-xs sm:text-sm font-semibold text-slate-900 tabular-nums leading-tight truncate';
+                return (
+                  <li key={lb.id}>
+                    <div className="rounded-xl border border-slate-200/90 bg-white shadow-sm hover:shadow-md transition-shadow overflow-hidden">
                       <Link
                         to={`/liteboard/${encodeURIComponent(lb.mint)}`}
                         className="block p-4 sm:p-5 no-underline text-inherit hover:bg-slate-50/80 min-w-0"
@@ -181,50 +225,68 @@ const LiteboardExplorerPage = () => {
                         </p>
                       </Link>
 
-                      <div className="border-t md:border-t-0 md:border-l border-slate-200 bg-slate-50/50 p-4 sm:p-5">
-                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                          <div
-                            className="rounded-lg bg-white border border-slate-200/90 px-3 py-2.5 text-center shadow-sm"
-                            title="USD market cap (pump.fun)"
-                          >
-                            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">
-                              Mkt cap
-                            </div>
-                            <div className="text-sm font-semibold text-slate-900 tabular-nums leading-tight">
+                      <div className="border-t border-slate-200 bg-slate-50/50 px-2 sm:px-4 py-3">
+                        <div
+                          className="grid grid-cols-4 gap-1.5 sm:gap-2"
+                          style={{ fontFamily: 'Arial, sans-serif' }}
+                        >
+                          <div className={statBox} title="USD market cap (pump.fun)">
+                            <div className={statLabel}>Mkt cap</div>
+                            <div className={statValue} title={formatUsdMarketCap(lb.usd_market_cap ?? null)}>
                               {formatUsdMarketCap(lb.usd_market_cap ?? null)}
                             </div>
                           </div>
-                          <div
-                            className="rounded-lg bg-white border border-slate-200/90 px-3 py-2.5 text-center shadow-sm"
-                            title="usd_market_cap ÷ 10⁹ (pump.fun convention)"
-                          >
-                            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">
-                              1 token
-                            </div>
-                            <div className="text-sm font-semibold text-slate-900 tabular-nums leading-tight">
+                          <div className={statBox} title="usd_market_cap ÷ 10⁹ (pump.fun convention)">
+                            <div className={statLabel}>1 token</div>
+                            <div className={statValue} title={formatUsdPerToken(lb.token_price_usd ?? null)}>
                               {formatUsdPerToken(lb.token_price_usd ?? null)}
                             </div>
                           </div>
-                          <div className="rounded-lg bg-white border border-slate-200/90 px-3 py-2.5 text-center shadow-sm">
-                            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">
-                              Threads
-                            </div>
-                            <div className="text-sm font-semibold text-slate-900 tabular-nums">{tc}</div>
+                          <div className={statBox}>
+                            <div className={statLabel}>Threads</div>
+                            <div className={statValue}>{tc}</div>
                           </div>
-                          <div className="rounded-lg bg-white border border-slate-200/90 px-3 py-2.5 text-center shadow-sm">
-                            <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5">
-                              Posts
-                            </div>
-                            <div className="text-sm font-semibold text-slate-900 tabular-nums">{pc}</div>
+                          <div className={statBox}>
+                            <div className={statLabel}>Posts</div>
+                            <div className={statValue}>{pc}</div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {totalPages > 1 ? (
+              <nav
+                className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4 border-t border-slate-200 pt-6"
+                aria-label="Pagination"
+                style={{ fontFamily: 'Arial, sans-serif' }}
+              >
+                <button
+                  type="button"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="text-sm px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-slate-600 tabular-nums">
+                  Page <strong className="text-slate-900">{page}</strong> of{' '}
+                  <strong className="text-slate-900">{totalPages}</strong>
+                </span>
+                <button
+                  type="button"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  className="text-sm px-4 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </nav>
+            ) : null}
+          </>
         )}
       </div>
     </div>
