@@ -39,6 +39,11 @@ As the stack grows (more contracts, indexers, ops runbooks), add sibling folders
 | `/forums/register` | Username registration (signed message). |
 | `/forums/account` | Profile / avatar / LITE holdings / socials. |
 | `/forums/admin` | Admin tools (`is_admin` wallets; signed admin API messages). |
+| `/liteboard/deploy` | Self-serve Liteboard creation (pump.fun–listed mints only; signed verify + create flow). |
+| `/liteboard/explorer` | Paginated list of Liteboards (search, sort by market cap / activity). |
+| `/liteboard/:mint` | Hub for one token: channels + optional pump.fun market stats. |
+| `/liteboard/:mint/:channel` | Channel thread list (`announcement` or `general`). |
+| `/liteboard/:mint/:channel/:threadNumber` | Thread view (posts, replies). |
 
 ### Backend API (Express, all under `/api`)
 
@@ -90,6 +95,19 @@ As the stack grows (more contracts, indexers, ops runbooks), add sibling folders
 - `POST /api/admin/users/patch`
 - `POST /api/admin/ban`
 - `POST /api/admin/delete-post`
+- `POST /api/admin/liteboard/grant` — staff-only: insert a `liteboards` row when automated pump.fun / creator checks block deploy (Bearer admin session).
+
+**Liteboards (per-SPL-mint mini forums; requires migration `021_liteboards.sql`)**
+
+- `POST /api/liteboard/verify-mint` — wallet signs a message; server checks mint against **pump.fun** public coin API and (when configured) creator authority; returns a **one-time code** hashed in `liteboard_creation_codes`.
+- `POST /api/liteboard/create` — registered user signs with code to create `liteboards` row; code is consumed.
+- `POST /api/liteboard/delete` — owner signs to delete board + threads + posts.
+- `GET /api/liteboards` — explorer list: query params `page`, `limit`, `sort` (`newest` \| `mc_desc` \| `mc_asc` \| `threads_desc` \| `posts_desc`), optional `q` (mint substring, min length 3).
+- `GET /api/liteboards/:mint` — single board + **pump.fun**-derived `token_name`, `token_symbol`, `usd_market_cap`, `token_price_usd` when available.
+- `GET /api/liteboards/:mint/threads` — threads for a channel (`channel=announcement` \| `general`).
+- `GET /api/liteboards/:mint/threads/:threadNum` — thread + posts (same channel query as above).
+- `POST /api/liteboard/threads` — new thread (signed; announcement channel restricted to board owner).
+- `POST /api/liteboard/replies` — reply (signed).
 
 Exact payloads and auth rules live in `server/index.mjs` (search for the route path).
 
@@ -100,6 +118,7 @@ Exact payloads and auth rules live in `server/index.mjs` (search for the route p
 - **Ranks:** `profiles.is_admin`, `profiles.is_moderator`; boards can set `min_rank_start_thread` / `min_rank_reply` (see migration `009`).
 - **Bans:** `profile_bans` — active bans block forum actions and are enforced in API handlers.
 - **On-chain attestations:** Rows in `forum_onchain_attestations` (after `011` + `012`) track relay status (`pending` / `failed` / `confirmed`), retries, and optional `last_error`. The API runs a **periodic retry** for failed attestations when the server process is up.
+- **Liteboards:** `liteboards` (one row per SPL mint), `liteboard_creation_codes` (hashed one-time deploy codes), `liteboard_threads` / `liteboard_thread_posts` (channels `announcement` \| `general`). Deploy is gated on **pump.fun** listing + mint metadata; implied $/token in UI uses `usd_market_cap ÷ 10⁹` (pump convention). See `021_liteboards.sql`.
 
 ---
 

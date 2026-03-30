@@ -45,7 +45,7 @@ For production, you can use `psql`, Supabase CLI migrations, or CI—what matter
 
 ---
 
-## Schema map (after 012)
+## Schema map (after 021)
 
 - **`profiles`** — Wallet, username, reputation, admin/mod flags, avatar, LITE cache, socials.
 - **`forum_boards`** / **`forum_threads`** / **`forum_thread_posts`** — Current forum model (URLs use `board_id` + `thread_number`).
@@ -54,6 +54,7 @@ For production, you can use `psql`, Supabase CLI migrations, or CI—what matter
 - **`forum_onchain_attestations`** — One row per relayed Memo attestation (hashes + metadata + tx sig when confirmed).
 - **`forum_polls`** / **`forum_poll_options`** / **`forum_poll_ballots`** — Optional poll per post; one ballot per wallet per poll (after 020).
 - **`profile_bans`** — Active bans by wallet.
+- **`liteboards`** / **`liteboard_creation_codes`** / **`liteboard_threads`** / **`liteboard_thread_posts`** — Per-mint mini forums (after 021); channels `announcement` (owner-only threads) and `general` (registered users).
 
 ---
 
@@ -61,6 +62,7 @@ For production, you can use `psql`, Supabase CLI migrations, or CI—what matter
 
 | Date | Change |
 |------|--------|
+| 2026-03-27 | `021` — Liteboards (`liteboards`, `liteboard_creation_codes`, `liteboard_threads`, `liteboard_thread_posts`). |
 | 2026-03-27 | `020` — Forum polls (`forum_polls`, options, ballots); `018` truncates poll tables when present. |
 | 2026-03-26 | `014` — Ligder Technical board (`LIGDER TECHNICAL`). |
 | 2026-03-26 | `013` — Ligder General boards (section `LIGDER GENERAL`). |

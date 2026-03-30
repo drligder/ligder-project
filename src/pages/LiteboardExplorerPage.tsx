@@ -103,7 +103,7 @@ const LiteboardExplorerPage = () => {
         </div>
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+          <h1 className="ligder-pixel-title text-2xl tracking-tight text-slate-900 mb-1">
             Liteboard Explorer
           </h1>
           <p className="text-sm text-slate-600 max-w-2xl" style={{ fontFamily: 'Times New Roman, serif' }}>
@@ -112,7 +112,7 @@ const LiteboardExplorerPage = () => {
           </p>
         </div>
 
-        <p className="text-xs text-amber-900 border border-amber-200/80 bg-amber-50 px-3 py-2.5 rounded-lg mb-6 shadow-sm" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <p className="text-xs text-gray-800 border border-gray-300 bg-gray-50 px-3 py-2 mb-6" style={{ fontFamily: 'Arial, sans-serif' }}>
           <strong>Deploy</strong> is limited to tokens listed on <strong>pump.fun</strong> for now.
         </p>
 

@@ -9,41 +9,7 @@ import { formatUsdMarketCap, formatUsdPerToken } from '../lib/formatUsd';
 import { liteboardTokenLabel } from '../lib/liteboardTokenLabel';
 import { parseApiJson } from '../lib/parseApiJson';
 import { uint8ToBase64 } from '../lib/uint8Base64';
-
-function AnnouncementChannelIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="m3 11 18-5v12L3 14v-3z" />
-      <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-    </svg>
-  );
-}
-
-function GeneralChannelIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  );
-}
+import { ForumBoardIcon } from '../components/forum/ForumBoardIcon';
 
 const LiteboardHubPage = () => {
   const { mint: mintParam } = useParams<{ mint: string }>();
@@ -184,7 +150,7 @@ const LiteboardHubPage = () => {
         ) : lb ? (
           <>
             <header className="text-center mb-8">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 mb-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+              <h1 className="ligder-pixel-title text-2xl tracking-tight text-slate-900 mb-1">
                 {tokenLabel ?? 'Liteboard'}
               </h1>
               {tokenLabel ? (
@@ -197,33 +163,33 @@ const LiteboardHubPage = () => {
 
             {(lb.usd_market_cap != null && Number.isFinite(lb.usd_market_cap)) ||
             (lb.token_price_usd != null && Number.isFinite(lb.token_price_usd)) ? (
-              <div className="mb-10 text-center">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3" style={{ fontFamily: 'Arial, sans-serif' }}>
+              <div className="mb-8 text-center">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
                   Market (pump.fun)
                 </p>
-                <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-sm flex flex-col items-center justify-center text-center min-h-[6.5rem]">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2 w-full">
+                <div className="grid grid-cols-2 gap-2 max-w-sm mx-auto">
+                  <div className="border border-gray-300 bg-white px-2 py-2 flex flex-col items-center justify-center text-center min-h-[3.25rem]">
+                    <div className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5 w-full leading-tight">
                       Mkt cap
                     </div>
-                    <div className="text-lg font-semibold text-slate-900 tabular-nums">
+                    <div className="text-sm font-semibold text-slate-900 tabular-nums leading-tight">
                       {formatUsdMarketCap(lb.usd_market_cap ?? null)}
                     </div>
                   </div>
                   <div
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-5 shadow-sm flex flex-col items-center justify-center text-center min-h-[6.5rem]"
+                    className="border border-gray-300 bg-white px-2 py-2 flex flex-col items-center justify-center text-center min-h-[3.25rem]"
                     title="usd_market_cap ÷ 10⁹"
                   >
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2 w-full">
+                    <div className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 mb-0.5 w-full leading-tight">
                       1 token
                     </div>
-                    <div className="text-lg font-semibold text-slate-900 tabular-nums">
+                    <div className="text-sm font-semibold text-slate-900 tabular-nums leading-tight">
                       {formatUsdPerToken(lb.token_price_usd ?? null)}
                     </div>
                   </div>
                 </div>
-                <p className="text-xs text-slate-500 mt-3 m-0 max-w-md mx-auto" style={{ fontFamily: 'Arial, sans-serif' }}>
-                  Implied $/token uses <code className="text-xs bg-slate-100 px-1 rounded">usd_market_cap</code> ÷ 10⁹.
+                <p className="text-[11px] text-slate-500 mt-2 m-0 max-w-sm mx-auto" style={{ fontFamily: 'Arial, sans-serif' }}>
+                  Implied $/token uses <code className="text-[10px] bg-gray-100 px-0.5 border border-gray-200">usd_market_cap</code> ÷ 10⁹.
                 </p>
               </div>
             ) : (
@@ -232,34 +198,38 @@ const LiteboardHubPage = () => {
               </p>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2 max-w-lg mx-auto">
               <Link
                 to={`/liteboard/${encMint}/announcement`}
-                className="block rounded-xl border border-amber-200/80 bg-gradient-to-b from-amber-50/90 to-white p-6 shadow-sm hover:shadow-md hover:border-amber-300/80 transition-all no-underline text-gray-900 text-center"
+                className="block border border-gray-300 bg-white px-3 py-2.5 no-underline text-gray-900 hover:bg-gray-50"
               >
-                <div className="flex justify-center mb-3 text-amber-700">
-                  <AnnouncementChannelIcon className="w-10 h-10" />
+                <div className="flex items-start gap-2 text-left">
+                  <ForumBoardIcon iconKey="megaphone" />
+                  <span>
+                    <span className="block text-sm font-bold m-0 mb-0.5" style={{ fontFamily: 'Arial, sans-serif' }}>
+                      Announcement
+                    </span>
+                    <span className="block text-xs text-slate-600 leading-snug m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
+                      Owner-only updates for this token.
+                    </span>
+                  </span>
                 </div>
-                <h2 className="text-base font-bold m-0 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
-                  Announcement
-                </h2>
-                <p className="text-sm text-slate-600 m-0 leading-snug" style={{ fontFamily: 'Times New Roman, serif' }}>
-                  Owner-only updates for this token.
-                </p>
               </Link>
               <Link
                 to={`/liteboard/${encMint}/general`}
-                className="block rounded-xl border border-sky-200/80 bg-gradient-to-b from-sky-50/90 to-white p-6 shadow-sm hover:shadow-md hover:border-sky-300/80 transition-all no-underline text-gray-900 text-center"
+                className="block border border-gray-300 bg-white px-3 py-2.5 no-underline text-gray-900 hover:bg-gray-50"
               >
-                <div className="flex justify-center mb-3 text-sky-700">
-                  <GeneralChannelIcon className="w-10 h-10" />
+                <div className="flex items-start gap-2 text-left">
+                  <ForumBoardIcon iconKey="chat" />
+                  <span>
+                    <span className="block text-sm font-bold m-0 mb-0.5" style={{ fontFamily: 'Arial, sans-serif' }}>
+                      General
+                    </span>
+                    <span className="block text-xs text-slate-600 leading-snug m-0" style={{ fontFamily: 'Times New Roman, serif' }}>
+                      Community chat for registered Ligder users.
+                    </span>
+                  </span>
                 </div>
-                <h2 className="text-base font-bold m-0 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
-                  General
-                </h2>
-                <p className="text-sm text-slate-600 m-0 leading-snug" style={{ fontFamily: 'Times New Roman, serif' }}>
-                  Community chat for registered Ligder users.
-                </p>
               </Link>
             </div>
 

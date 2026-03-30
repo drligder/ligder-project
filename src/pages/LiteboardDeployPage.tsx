@@ -143,7 +143,7 @@ const LiteboardDeployPage = () => {
           </div>
         </div>
 
-        <h1 className="text-xl font-bold text-gray-900 mb-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <h1 className="ligder-pixel-title text-xl text-gray-900 mb-2">
           Deploy a Liteboard
         </h1>
         <p className="text-sm text-gray-700 mb-3" style={{ fontFamily: 'Times New Roman, serif' }}>
