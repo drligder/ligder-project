@@ -261,7 +261,13 @@ const ThreadViewPage = () => {
       const j = await parseApiJson<{
         reputations?: Record<
           string,
-          { total?: number; likes?: number; dislikes?: number }
+          {
+            total?: number;
+            likes?: number;
+            dislikes?: number;
+            posts_count?: number;
+            threads_started?: number;
+          }
         >;
         error?: string;
       }>(r);
@@ -275,6 +281,9 @@ const ThreadViewPage = () => {
           likesOnPosts: typeof row?.likes === 'number' ? row.likes : null,
           dislikesOnPosts:
             typeof row?.dislikes === 'number' ? row.dislikes : null,
+          postsCount: typeof row?.posts_count === 'number' ? row.posts_count : null,
+          threadsStarted:
+            typeof row?.threads_started === 'number' ? row.threads_started : null,
         };
       }
       setStatsByUser(next);
@@ -285,6 +294,8 @@ const ThreadViewPage = () => {
           reputation: null,
           likesOnPosts: null,
           dislikesOnPosts: null,
+          postsCount: null,
+          threadsStarted: null,
         };
       }
       setStatsByUser(next);
