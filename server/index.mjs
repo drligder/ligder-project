@@ -2081,6 +2081,26 @@ function parseLiteboardCreateMessage(message) {
   return { mint, code };
 }
 
+function messageLooksLikeLiteboardDelete(message, wallet) {
+  return (
+    message.startsWith('Ligder liteboard delete\n') &&
+    message.includes(`Wallet: ${wallet}`) &&
+    message.includes('Mint:') &&
+    message.includes('Nonce:')
+  );
+}
+
+function parseLiteboardDeleteMessage(message) {
+  const mintLine = message.match(/^Mint:\s*(.+)$/m);
+  if (!mintLine) return null;
+  try {
+    const mint = new PublicKey(mintLine[1].trim()).toBase58();
+    return { mint };
+  } catch {
+    return null;
+  }
+}
+
 function messageLooksLikeLiteboardNewThread(message, wallet) {
   return (
     message.startsWith('Ligder liteboard new thread\n') &&
@@ -7484,6 +7504,75 @@ app.post('/api/liteboard/create', async (req, res) => {
     .update({ used_at: nowIso })
     .eq('id', codeRow.id);
   return res.status(201).json({ liteboard: lbIns });
+});
+
+app.post('/api/liteboard/delete', async (req, res) => {
+  const { wallet, message, signature } = req.body ?? {};
+  if (
+    typeof wallet !== 'string' ||
+    typeof message !== 'string' ||
+    typeof signature !== 'string'
+  ) {
+    return res.status(400).json({ error: 'Invalid payload' });
+  }
+  let walletOk;
+  try {
+    walletOk = new PublicKey(wallet).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid wallet' });
+  }
+  if (!messageLooksLikeLiteboardDelete(message, walletOk)) {
+    return res.status(400).json({ error: 'Invalid liteboard delete message' });
+  }
+  if (!verifyWalletSignature(walletOk, message, signature)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  const parsed = parseLiteboardDeleteMessage(message);
+  if (!parsed) {
+    return res.status(400).json({ error: 'Could not parse mint from message' });
+  }
+  const banD = await getActiveBan(walletOk);
+  if (banD) {
+    return res.status(403).json({
+      error: `You are banned until ${new Date(banD.banned_until).toLocaleString()}.`,
+    });
+  }
+  let mintCanon;
+  try {
+    mintCanon = new PublicKey(parsed.mint.trim()).toBase58();
+  } catch {
+    return res.status(400).json({ error: 'Invalid mint' });
+  }
+  const { data: lb, error: lbErr } = await supabase
+    .from('liteboards')
+    .select('id, owner_wallet, mint')
+    .eq('mint', mintCanon)
+    .maybeSingle();
+  if (lbErr) {
+    console.error(lbErr);
+    return res.status(500).json({ error: lbErr.message });
+  }
+  if (!lb) {
+    return res.status(404).json({ error: 'Liteboard not found' });
+  }
+  if (lb.owner_wallet !== walletOk) {
+    return res.status(403).json({
+      error: 'Only the deploy wallet (owner) can remove this Liteboard.',
+    });
+  }
+  await supabase.from('liteboard_creation_codes').delete().eq('mint', mintCanon);
+  const { error: delErr } = await supabase.from('liteboards').delete().eq('id', lb.id);
+  if (delErr) {
+    const m = String(delErr.message ?? '');
+    if (/does not exist|relation/i.test(m)) {
+      return res.status(500).json({
+        error: 'Run SQL migration 021_liteboards.sql on the database',
+      });
+    }
+    console.error(delErr);
+    return res.status(500).json({ error: delErr.message });
+  }
+  return res.json({ ok: true, deleted_mint: mintCanon });
 });
 
 app.get('/api/liteboards', async (req, res) => {
