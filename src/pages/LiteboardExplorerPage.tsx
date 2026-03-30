@@ -4,6 +4,7 @@ import { LoginDropdown } from '../components/LoginDropdown';
 import { useWallet } from '../contexts/WalletContext';
 import { useLigderProfile } from '../hooks/useLigderProfile';
 import { apiUrl } from '../lib/apiBase';
+import { formatUsdMarketCap, formatUsdPerToken } from '../lib/formatUsd';
 import { liteboardTokenLabel } from '../lib/liteboardTokenLabel';
 import { parseApiJson } from '../lib/parseApiJson';
 
@@ -16,6 +17,8 @@ type LiteboardRow = {
   token_symbol?: string | null;
   threads_count?: number;
   posts_count?: number;
+  usd_market_cap?: number | null;
+  token_price_usd?: number | null;
 };
 
 const LiteboardExplorerPage = () => {
@@ -146,9 +149,15 @@ const LiteboardExplorerPage = () => {
                     </div>
                   </Link>
                   <div
-                    className="flex sm:flex-col justify-end sm:justify-center gap-3 sm:gap-1 px-3 py-3 sm:py-3 sm:min-w-[7.5rem] sm:border-l border-gray-200 text-xs text-gray-600 tabular-nums text-right sm:text-right"
+                    className="flex flex-wrap sm:flex-col justify-end sm:justify-end gap-x-3 gap-y-1 sm:gap-1 px-3 py-3 sm:py-3 sm:min-w-[10.5rem] sm:border-l border-gray-200 text-xs text-gray-600 tabular-nums text-right sm:text-right"
                     style={{ fontFamily: 'Arial, sans-serif' }}
                   >
+                    <span className="w-full sm:w-auto">
+                      MC {formatUsdMarketCap(lb.usd_market_cap ?? null)}
+                    </span>
+                    <span className="w-full sm:w-auto" title="usd_market_cap ÷ 10⁹ (pump.fun convention)">
+                      1 token = {formatUsdPerToken(lb.token_price_usd ?? null)}
+                    </span>
                     <span>
                       {tc} thread{tc === 1 ? '' : 's'}
                     </span>

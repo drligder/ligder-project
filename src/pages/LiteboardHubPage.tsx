@@ -4,6 +4,7 @@ import { LoginDropdown } from '../components/LoginDropdown';
 import { useLigderProfile } from '../hooks/useLigderProfile';
 import { useWallet } from '../contexts/WalletContext';
 import { apiUrl } from '../lib/apiBase';
+import { formatUsdMarketCap, formatUsdPerToken } from '../lib/formatUsd';
 import { liteboardTokenLabel } from '../lib/liteboardTokenLabel';
 import { parseApiJson } from '../lib/parseApiJson';
 
@@ -21,6 +22,8 @@ const LiteboardHubPage = () => {
     created_at: string;
     token_name?: string | null;
     token_symbol?: string | null;
+    usd_market_cap?: number | null;
+    token_price_usd?: number | null;
   } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +39,16 @@ const LiteboardHubPage = () => {
     try {
       const r = await fetch(apiUrl(`/api/liteboards/${encodeURIComponent(mint)}`));
       const j = await parseApiJson<{
-        liteboard?: { id: string; mint: string; owner_wallet: string; created_at: string };
+        liteboard?: {
+          id: string;
+          mint: string;
+          owner_wallet: string;
+          created_at: string;
+          token_name?: string | null;
+          token_symbol?: string | null;
+          usd_market_cap?: number | null;
+          token_price_usd?: number | null;
+        };
         error?: string;
       }>(r);
       if (!r.ok) {
@@ -97,7 +109,28 @@ const LiteboardHubPage = () => {
                 Liteboard
               </p>
             ) : null}
-            <p className="text-xs font-mono text-gray-700 break-all mb-6">{lb.mint}</p>
+            <p className="text-xs font-mono text-gray-700 break-all mb-3">{lb.mint}</p>
+            {(lb.usd_market_cap != null && Number.isFinite(lb.usd_market_cap)) ||
+            (lb.token_price_usd != null && Number.isFinite(lb.token_price_usd)) ? (
+              <p
+                className="text-sm text-gray-800 mb-6"
+                style={{ fontFamily: 'Arial, sans-serif' }}
+              >
+                <span className="text-gray-600">Market cap </span>
+                {formatUsdMarketCap(lb.usd_market_cap ?? null)}
+                <span className="text-gray-500 mx-2">·</span>
+                <span className="text-gray-600">1 token = </span>
+                {formatUsdPerToken(lb.token_price_usd ?? null)}
+                <span className="block text-xs text-gray-500 mt-1 font-normal">
+                  pump.fun: <code className="text-xs bg-gray-100 px-1">usd_market_cap</code> ÷ 10⁹ for implied
+                  $/token.
+                </span>
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500 mb-6" style={{ fontFamily: 'Arial, sans-serif' }}>
+                Market data unavailable (mint not on pump.fun index).
+              </p>
+            )}
             <div className="grid gap-4 sm:grid-cols-2">
               <Link
                 to={`/liteboard/${encMint}/announcement`}

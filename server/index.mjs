@@ -1702,8 +1702,22 @@ async function assertMintListedOnPumpFunForLiteboardDeploy(mintCanon) {
  * Human-readable token name + ticker for UI (hub, etc.).
  * Order: Metaplex metadata PDA → Token-2022 on-mint extension → pump.fun (if listed) → Jupiter token list CDN / lite-api.
  */
+/**
+ * pump.fun exposes `usd_market_cap`; implied $/token used on pump UI is mc / 1e9 (1B fixed point).
+ */
+function pumpFunUsdPricePerTokenFromMarketCap(usdMarketCap) {
+  const mc = Number(usdMarketCap);
+  if (!Number.isFinite(mc) || mc < 0) return null;
+  return mc / 1_000_000_000;
+}
+
 async function fetchSplMintDisplayMetadata(mintCanon) {
-  const empty = { token_name: null, token_symbol: null };
+  const empty = {
+    token_name: null,
+    token_symbol: null,
+    usd_market_cap: null,
+    token_price_usd: null,
+  };
   let mintPk;
   try {
     mintPk = new PublicKey(mintCanon);
@@ -1754,16 +1768,23 @@ async function fetchSplMintDisplayMetadata(mintCanon) {
     }
   }
 
-  if ((!token_name || !token_symbol) && LITEBOARD_USE_PUMP_FUN) {
-    try {
-      const pump = await fetchPumpFunCoinRecord(mintCanon);
-      if (pump) {
+  let usd_market_cap = null;
+  let token_price_usd = null;
+  try {
+    const pump = await fetchPumpFunCoinRecordRaw(mintCanon);
+    if (pump) {
+      if (LITEBOARD_USE_PUMP_FUN) {
         if (!token_name) token_name = trimSplMetaDisplayString(pump.name);
         if (!token_symbol) token_symbol = trimSplMetaDisplayString(pump.symbol);
       }
-    } catch {
-      /* ignore */
+      const mc = Number(pump.usd_market_cap);
+      if (Number.isFinite(mc) && mc >= 0) {
+        usd_market_cap = mc;
+        token_price_usd = pumpFunUsdPricePerTokenFromMarketCap(mc);
+      }
     }
+  } catch {
+    /* pump.fun optional for display */
   }
 
   const needJup = !token_name || !token_symbol;
@@ -1800,7 +1821,7 @@ async function fetchSplMintDisplayMetadata(mintCanon) {
     }
   }
 
-  return { token_name, token_symbol };
+  return { token_name, token_symbol, usd_market_cap, token_price_usd };
 }
 
 /**
@@ -1869,7 +1890,13 @@ async function enrichLiteboardsTokenMeta(rows, concurrency = 5) {
         out[i] = { ...row, ...meta };
       } catch (e) {
         console.error('liteboard list token meta', row.mint, e);
-        out[i] = { ...row, token_name: null, token_symbol: null };
+        out[i] = {
+          ...row,
+          token_name: null,
+          token_symbol: null,
+          usd_market_cap: null,
+          token_price_usd: null,
+        };
       }
     }
   }
@@ -7514,6 +7541,8 @@ app.get('/api/liteboards', async (req, res) => {
         ...r,
         token_name: null,
         token_symbol: null,
+        usd_market_cap: null,
+        token_price_usd: null,
       })),
     });
   }
@@ -7538,7 +7567,12 @@ app.get('/api/liteboards/:mint', async (req, res) => {
   if (!data) {
     return res.status(404).json({ error: 'Liteboard not found' });
   }
-  let tokenMeta = { token_name: null, token_symbol: null };
+  let tokenMeta = {
+    token_name: null,
+    token_symbol: null,
+    usd_market_cap: null,
+    token_price_usd: null,
+  };
   try {
     tokenMeta = await fetchSplMintDisplayMetadata(mintOk);
   } catch (e) {
@@ -7676,7 +7710,12 @@ app.get('/api/liteboards/:mint/threads/:threadNum', async (req, res) => {
       author_is_moderator: pr?.is_moderator === true && pr?.is_admin !== true,
     };
   });
-  let tokenMeta = { token_name: null, token_symbol: null };
+  let tokenMeta = {
+    token_name: null,
+    token_symbol: null,
+    usd_market_cap: null,
+    token_price_usd: null,
+  };
   try {
     tokenMeta = await fetchSplMintDisplayMetadata(mintOk);
   } catch (e) {
