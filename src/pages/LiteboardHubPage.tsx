@@ -16,7 +16,7 @@ const LiteboardHubPage = () => {
   const navigate = useNavigate();
   const { publicKey, signMessage } = useWallet();
   const { showToast } = useToast();
-  const { profileLoading } = useLigderProfile();
+  const { isRegistered, profileLoading } = useLigderProfile();
   const showRegister = publicKey ? !profileLoading && !isRegistered : true;
 
   const [lb, setLb] = useState<{
