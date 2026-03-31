@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import LoadingScreen from './components/LoadingScreen';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AdminPage from './pages/AdminPage';
 import ArchivePage from './pages/ArchivePage';
@@ -36,19 +35,6 @@ function ScrollToTopOnRouteChange() {
 }
 
 function App() {
-  const [isLoading, setIsLoading] = useState(() => {
-    const p = typeof window !== 'undefined' ? window.location.pathname : '/';
-    return p === '/' || p === '';
-  });
-
-  const handleLoadingComplete = useCallback(() => {
-    setIsLoading(false);
-  }, []);
-
-  if (isLoading) {
-    return <LoadingScreen onComplete={handleLoadingComplete} />;
-  }
-
   return (
     <>
       <ScrollToTopOnRouteChange />
